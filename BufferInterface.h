@@ -47,8 +47,19 @@ public:
 	~BufferInterface();
 	void FillBuffer(uint64_t address, Type iswhat);
 	bool IsFilled(Type iswhat);
+	bool AuxIsFilled(Type iswhat);
 	bool XEnd(); //MAC2로 넘어갈 준비가 되었는가
 	bool AEnd(); //모든 MAC이 끝났는가
+	bool XRowEnd();
+	bool XColEnd();
+	bool XValEnd();
+	bool ARowEnd();
+	bool AColEnd();
+	bool AuxXRowEnd();
+	bool AuxXColEnd();
+	bool AuxXValEnd();
+	bool AuxARowEnd();
+	bool AuxAColEnd();
 	void Reset(); //다시 채우는 함수
 	uint64_t PopData(Type iswhat);
 	float PopValData();

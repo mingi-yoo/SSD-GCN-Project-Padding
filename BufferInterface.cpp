@@ -145,6 +145,34 @@ bool BufferInterface::IsFilled(Type iswhat)
 	return ret;
 }
 
+bool BufferInterface::AuxIsFilled(Type iswhat)
+{
+	bool ret;
+
+	switch (iswhat)
+	{
+		case A_COL:
+			ret = aux_flag.a_col;
+			break;
+		case A_ROW:
+			ret = aux_flag.a_row;
+			break;
+		case X_VAL:
+			ret = aux_flag.x_val;
+			break;
+		case X_COL:
+			ret = aux_flag.x_col;
+			break;
+		case X_ROW:
+			ret = aux_flag.x_row;
+			break;
+		case WEIGHT:
+		case OUTPUT:
+	}
+
+	return ret;
+}
+
 void BufferInterface::Reset()
 {
 	axbuffer.size = axbuffersize;
@@ -303,12 +331,12 @@ bool BufferInterface::XEnd()
 {
 	// TODO
 	if (!isA && 
-		present.rowindex > data->ifrowindex.size() && 
-		present.colindex > data->ifcolindex.size() &&
-		present.valindex > data->ifvalue.size() &&
-		aux_present.rowindex > data->ifrowindex.size() &&
-		aux_present.colindex > data->ifcolindex.size() &&
-		aux_present.valindex > data->ifvalue.size())
+		present.rowindex >= data->ifrowindex.size() && 
+		present.colindex >= data->ifcolindex.size() &&
+		present.valindex >= data->ifvalue.size() &&
+		aux_present.rowindex >= data->ifrowindex.size() &&
+		aux_present.colindex >= data->ifcolindex.size() &&
+		aux_present.valindex >= data->ifvalue.size())
 		return true;
 	else
 		return false; // Dummy
@@ -318,17 +346,94 @@ bool BufferInterface::AEnd()
 {
 	// TODO
 	if (isA && 
-		present.rowindex > data->adjrowindex.size() && 
-		present.colindex > data->adjcolindex.size() &&
-		aux_present.rowindex > data->adjrowindex.size() &&
-		aux_present.colindex > data->adjcolindex.size())
+		present.rowindex >= data->adjrowindex.size() && 
+		present.colindex >= data->adjcolindex.size() &&
+		aux_present.rowindex >= data->adjrowindex.size() &&
+		aux_present.colindex >= data->adjcolindex.size())
 		return true;
 	else
 		return false; // Dummy
 }
 
+bool BufferInterface::XRowEnd()
+{
+	if (!isA && present.rowindex >= data->ifrowindex.size())
+		return true;
+	else
+		return false;
+}
 
+bool BufferInterface::XColEnd()
+{
+	if (!isA && present.colindex >= data->ifcolindex.size())
+		return true;
+	else
+		return false;
+}
 
+bool BufferInterface::XValEnd()
+{
+	if (!isA && present.valindex >= data->ifvalue.size())
+		return true;
+	else
+		return false;
+}
+
+bool BufferInterface::ARowEnd()
+{
+	if (isA && present.rowindex >= data->adjrowindex.size())
+		return true;
+	else
+		return false;
+}
+
+bool BufferInterface::AColEnd()
+{
+	if (isA && present.colindex >= data->adjcolindex.size())
+		return true;
+	else
+		return false;
+}
+
+bool BufferInterface::AuxXRowEnd()
+{
+	if (!isA && aux_present.rowindex >= data->ifrowindex.size())
+		return true;
+	else
+		return false;
+}
+
+bool BufferInterface::AuxXColEnd()
+{
+	if (!isA && aux_present.colindex >= data->ifcolindex.size())
+		return true;
+	else
+		return false;
+}
+
+bool BufferInterface::AuxXValEnd()
+{
+	if (!isA && aux_present.valindex >= data->ifvalue.size())
+		return true;
+	else
+		return false;
+}
+
+bool BufferInterface::AuxARowEnd()
+{
+	if (isA && aux_present.rowindex >= data->adjrowindex.size())
+		return true;
+	else
+		return false;
+}
+
+bool BufferInterface::AuxAColEnd()
+{
+	if (isA && aux_present.colindex >= data->adjcolindex.size())
+		return true;
+	else
+		return false;
+}
 /* weight buffer 를 위한 함수들
 
   canRequest() : request를 보낼 수 있는 상태인지 확인
