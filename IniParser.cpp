@@ -24,13 +24,7 @@ bool IniParser::ReadIni(string path)
 			m_table[token1] = token2;
 		}
 		openFile.close();
-		GetAXBufferSize("AXBufferSize");
-		GetWeightBufferSize("WeightBufferSize");
-		GetOutputBufferSize("OutputBufferSize");
-		GetRAMQueueSize("RAMQueueSize");
-		GetAccDimension("AccDimension");
-		GetMemoryBandwidth("MemoryBandwidth");
-		GetClockPeriod("ClockPeriod");
+		ParseIni();
 		return true;
 	}
 	else {
@@ -95,37 +89,21 @@ uint64_t IniParser::GetUint64(string name)
 		throw invalid_argument("Not exist.");
 }
 
-void IniParser::GetAXBufferSize(string name)
+void IniParser::ParseIni()
 {
-	axbuffer = GetUint64(name);
-}
-
-void IniParser::GetWeightBufferSize(string name)
-{
-	weightbuffer = GetUint64(name);
-}
-
-void IniParser::GetOutputBufferSize(string name)
-{
-	outputbuffer = GetUint64(name);
-}
-
-void IniParser::GetRAMQueueSize(string name)
-{
-	ramqueue = GetUint64(name);
-}
-
-void IniParser::GetAccDimension(string name)
-{
-	accdimension = GetUint64(name);
-}
-
-void IniParser::GetMemoryBandwidth(string name)
-{
-	membandwidth = GetUint64(name);
-}
-
-void IniParser::GetClockPeriod(string name)
-{
-	clk_period_in_ns = GetFloat(name);
+	axbuffer = GetUint64("AXBufferSize");
+	weightbuffer = GetUint64("WeightBufferSize");
+	outputbuffer = GetUint64("OutputBufferSize");
+	accdimension = GetUint64("AccDimension");
+	clk_period_in_ns = GetFloat("ClockPeriod");
+	MAX_READ_BYTE = GetUint64("MaximumByteRead");
+	MAX_READ_INT = GetUint64("MaximumNumberRead");
+	UNIT_INT_BYTE = GetUint64("UnitByteforNumber");
+	A_COL_START = GetUint64("AColStartAddress");
+	A_ROW_START = GetUint64("ARowStartAddress");
+	X_VAL_START = GetUint64("XValStartAddress");
+	X_COL_START = GetUint64("XColStartAddress");
+	X_ROW_START = GetUint64("XRowStartAddress");
+	WEIGHT_START = GetUint64("WeightStartAddress");
+	OUTPUT_START = GetUint64("OutputStartAddress");
 }

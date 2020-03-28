@@ -13,9 +13,9 @@ BufferInterface::BufferInterface(uint64_t axbuffersize,
 {
 	axbuffer.size = axbuffersize;
 	axbuffer.remain_space = axbuffersize;
-	axbuffer.valindex = 0;
-	axbuffer.colindex = 0;
-	axbuffer.rowindex = 0;
+	axbuffer.valindex = -1;
+	axbuffer.colindex = -1;
+	axbuffer.rowindex = -1;
 
 	aux_axbuffer.size = axbuffersize;
 	aux_axbuffer.remain_space = axbuffersize;
@@ -103,7 +103,6 @@ void BufferInterface::FillBuffer(uint64_t address, Type iswhat)
 		case WEIGHT:
 			uint64_t row = address / (UNIT_INT_BYTE * weightsize.tuple[1]);
 			uint64_t col = (address - row * weightsize.tuple[1] * UNIT_INT_BYTE) / UNIT_INT_BYTE;
-			assert(row < weightsize.tuple[0] && col < weightsize.tuple[1]);
 			Tuple insert = {{row, col}};
 			weightbuffer.active.push_back(insert);
 			if(weightbuffer.remain_space >= MAX_READ_BYTE) // 꽉 차기 전까지만
@@ -166,8 +165,6 @@ bool BufferInterface::AuxIsFilled(Type iswhat)
 		case X_ROW:
 			ret = aux_flag.x_row;
 			break;
-		case WEIGHT:
-		case OUTPUT:
 	}
 
 	return ret;
@@ -337,7 +334,10 @@ bool BufferInterface::XEnd()
 		aux_present.rowindex >= data->ifrowindex.size() &&
 		aux_present.colindex >= data->ifcolindex.size() &&
 		aux_present.valindex >= data->ifvalue.size())
+	{
+		isA = true;
 		return true;
+	}
 	else
 		return false; // Dummy
 }
@@ -357,6 +357,7 @@ bool BufferInterface::AEnd()
 
 bool BufferInterface::XRowEnd()
 {
+	//cout<<present.rowindex<<" .... "<<data->ifrowindex.size()<<endl;
 	if (!isA && present.rowindex >= data->ifrowindex.size())
 		return true;
 	else
@@ -384,7 +385,9 @@ bool BufferInterface::ARowEnd()
 	if (isA && present.rowindex >= data->adjrowindex.size())
 		return true;
 	else
+	{
 		return false;
+	}
 }
 
 bool BufferInterface::AColEnd()
@@ -462,7 +465,6 @@ bool BufferInterface::canRequest()
 bool BufferInterface::isExist(uint64_t address) // for weight address
 {
 	// weight address인 경우만 취급 // 일단 두번째 mac에 대해서는 고려하지 않음
-	assert(address < A_COL_START);
 
 	uint64_t row = address / (UNIT_INT_BYTE * weightsize.tuple[1]);
 	uint64_t col = (address - row * weightsize.tuple[1] * UNIT_INT_BYTE) / UNIT_INT_BYTE;
@@ -498,7 +500,6 @@ void BufferInterface::MACEnd() // 계산 끝나면 실행시켜 줘야됨
 
 bool BufferInterface::Expire(uint64_t address) // 특정 address만 expire하기 위한 용도
 {
-	assert(address < A_COL_START);
 
 	uint64_t row = address / (UNIT_INT_BYTE * weightsize.tuple[1]);
 	uint64_t col = (address - row * weightsize.tuple[1] * UNIT_INT_BYTE) / UNIT_INT_BYTE;

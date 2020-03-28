@@ -6,6 +6,8 @@
 
 using namespace std;
 
+extern uint64_t cycle;
+
 Accelerator::Accelerator(uint64_t accdimension, DRAMInterface *dram_, BufferInterface *buffer_) 
 {
 	num_of_pe = accdimension;
@@ -53,15 +55,26 @@ bool Accelerator::Run()
 	bool ret;
 
 	ret = true;
-
+	/*
+	cout << buffer->ARowEnd()<<" "<<buffer->AColEnd()<<endl;
+	cout << buffer->AuxARowEnd()<<" "<<buffer->AuxAColEnd()<<endl;
+	cout<<"......................"<<endl;
+	*/
 	if (buffer->XEnd() && v_fold_over)
 	{
 		present_w_fold++;
 		buffer->Reset();
 		Reset();
+		flag.x_row_req = true;
+		flag.x_val_req = false;
+		flag.x_col_req = false;
+		flag.weight_req = false;
+		present_v_fold = 0;
 		if (present_w_fold > w_fold)
 		{
 			present_w_fold = 0;
+			flag.x_row_req = false;
+			flag.a_row_req = true;
 			flag.mac_1 = false;
 			flag.mac_2 = true;
 		}
@@ -71,6 +84,10 @@ bool Accelerator::Run()
 		present_w_fold++;
 		buffer->Reset();
 		Reset();
+		flag.a_row_req = true;
+		flag.a_col_req = false;
+		flag.weight_req = false;
+		present_v_fold = 0;
 		if (present_w_fold > w_fold)
 		{
 			ret = false;
@@ -105,12 +122,16 @@ void Accelerator::RequestControllerRun()
 		buffer->present_ax_req += MAX_READ_BYTE;
 		if (buffer->IsFilled(A_ROW) && buffer->IsFilled(A_COL) && flag.ax_req_ok)
 		{
-			while (remain_col_num == 0)
+			if (remain_col_num == 0)
 			{
 				remain_col_num = buffer->PopData(A_ROW);
+				flag.a_col_req = false;
 			}
-			flag.weight_req = true;
-			flag.a_col_req = false;
+			else
+			{
+				flag.weight_req = true;
+				flag.a_col_req = false;
+			}
 		}
 	}
 	else if (flag.x_row_req && !buffer->IsFilled(X_ROW) && flag.ax_req_ok)
@@ -129,13 +150,18 @@ void Accelerator::RequestControllerRun()
 		buffer->present_ax_req += MAX_READ_BYTE;
 		if (buffer->IsFilled(X_ROW) && buffer->IsFilled(X_COL) && buffer->IsFilled(X_VAL))
 		{
-			while (remain_col_num == 0)
+			if (remain_col_num == 0)
 			{
 				remain_col_num = buffer->PopData(X_ROW);
+				flag.x_col_req = false;
+				flag.x_val_req = false;
 			}
-			flag.weight_req = true;
-			flag.x_col_req = false;
-			flag.x_val_req = false;
+			else
+			{
+				flag.weight_req = true;
+				flag.x_col_req = false;
+				flag.x_val_req = false;
+			}
 		}
 	}
 	else if (flag.weight_req && flag.w_req_ok)
@@ -166,9 +192,13 @@ void Accelerator::RequestControllerRun()
 						flag.weight_req = false;
 					}
 				}
-				else
+				else if (!buffer->XRowEnd())
 				{
 					flag.x_row_req = true;
+					flag.weight_req = false;
+				}
+				else
+				{
 					flag.weight_req = false;
 				}
 			}
@@ -177,6 +207,12 @@ void Accelerator::RequestControllerRun()
 				flag.x_col_req = true;
 				flag.x_val_req = true;
 				flag.weight_req = false;
+			}
+			else if (buffer->XColEnd() && buffer->XValEnd())
+			{
+				flag.weight_req = false;
+				while (!buffer->XRowEnd())
+					buffer->PopData(X_ROW);
 			}
 		}
 		else
@@ -203,9 +239,13 @@ void Accelerator::RequestControllerRun()
 						flag.weight_req = false;
 					}
 				}
-				else
+				else if (!buffer->ARowEnd())
 				{
 					flag.a_row_req = true;
+					flag.weight_req = false;
+				}
+				else
+				{
 					flag.weight_req = false;
 				}
 			}
@@ -213,6 +253,12 @@ void Accelerator::RequestControllerRun()
 			{
 				flag.a_col_req = true;
 				flag.weight_req = false;
+			}
+			else if (buffer->AColEnd())
+			{
+				flag.weight_req = false;
+				while (!buffer->ARowEnd())
+					buffer->PopData(A_ROW);
 			}
 		}
 		buffer->present_w_req += MAX_READ_BYTE;	
@@ -223,25 +269,31 @@ void Accelerator::RequestControllerRun()
 		{
 			if (buffer->IsFilled(X_ROW) && buffer->IsFilled(X_COL) && buffer->IsFilled(X_VAL))
 			{
-				while (remain_col_num == 0)
+				if (remain_col_num == 0)
 				{
 					remain_col_num = buffer->PopData(X_ROW);
 				}
-				flag.weight_req = true;
-				flag.x_col_req = false;
-				flag.x_val_req = false;
+				else
+				{
+					flag.weight_req = true;
+					flag.x_col_req = false;
+					flag.x_val_req = false;
+				}
 			}
 		}
 		else
 		{
 			if (buffer->IsFilled(A_ROW) && buffer->IsFilled(A_COL) && flag.ax_req_ok)
 			{	
-				while (remain_col_num == 0)
+				if (remain_col_num == 0)
 				{
 					remain_col_num = buffer->PopData(A_ROW);
 				}
-				flag.weight_req = true;
-				flag.a_col_req = false;
+				else
+				{
+					flag.weight_req = true;
+					flag.a_col_req = false;
+				}
 			}
 		}
 	}
@@ -255,16 +307,26 @@ void Accelerator::MACControllerRun()
 	{
 		if (flag.mac_1)
 		{
-			if (present_v_fold == 0)
+			if (present_v_fold == 0 && remain_mac_col == 0 && buffer->AuxIsFilled(X_ROW))
 			{
-				v_fold_over = false;
-				present_mac_val = buffer->ReadValMACData();
-				while (remain_mac_col == 0 && buffer->AuxIsFilled(X_ROW))
+				remain_mac_col = buffer->ReadMACData(X_ROW);
+				present_mac_row++;
+				if (remain_mac_col == 0)
 				{
-					remain_mac_col = buffer->ReadMACData(X_ROW);
-					present_mac_row++;
+					v_fold_over = true;
+					present_mac_val = 0;
+					present_mac_col = 0;
+					address = OUTPUT_START + (present_mac_row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
+					cout<<":MAC1 Running... Row: "<<present_mac_row<<"is zero row...";
+					dram->DRAMRequest(address, true);
+					return;
 				}
-				present_mac_col = buffer->ReadMACData(X_COL);
+				else
+				{
+					v_fold_over = false;
+					present_mac_val = buffer->ReadValMACData();
+					present_mac_col = buffer->ReadMACData(X_COL);
+				}
 			}
 			cout<<"MAC1 Running... v_fold: "<< present_v_fold<<
 			" w_fold: "<<present_w_fold<<
@@ -284,7 +346,7 @@ void Accelerator::MACControllerRun()
 				if (remain_mac_col == 0)
 				{
 					cout<<"Row "<<present_mac_row<<" is Complete."<<endl;
-					address = OUTPUT_START + (present_mac_row * buffer->weightsize.tuple[1] + present_v_fold * MAX_READ_INT) * UNIT_INT_BYTE;
+					address = OUTPUT_START + (present_mac_row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
 					dram->DRAMRequest(address, true);
 					if (buffer->AuxXValEnd() && buffer->AuxXColEnd() && !buffer->AuxXRowEnd())
 					{
@@ -296,15 +358,24 @@ void Accelerator::MACControllerRun()
 		}
 		else
 		{
-			if (present_v_fold == 0)
+			if (present_v_fold == 0 && remain_mac_col == 0 && buffer->AuxIsFilled(A_ROW))
 			{
-				v_fold_over = false;
-				while (remain_mac_col == 0 && buffer->AuxIsFilled(A_ROW))
+				remain_mac_col = buffer->ReadMACData(A_ROW);
+				present_mac_row++;
+				if (remain_mac_col == 0)
 				{
-					remain_mac_col = buffer->ReadMACData(A_ROW);
-					present_mac_row++;
+					v_fold_over = true;
+					present_mac_val = 0;
+					present_mac_col = 0;
+					address = OUTPUT_START + (present_mac_row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
+					dram->DRAMRequest(address, true);
+					return;
 				}
-				present_mac_col = buffer->ReadMACData(A_COL);
+				else
+				{
+					v_fold_over = false;
+					present_mac_col = buffer->ReadMACData(A_COL);
+				}
 			}
 			cout<<"MAC2 Running... v_fold: "<< present_v_fold<<
 			" w_fold: "<<present_w_fold<<
@@ -323,7 +394,7 @@ void Accelerator::MACControllerRun()
 				if (remain_mac_col == 0)
 				{
 					cout<<"Row "<<present_mac_row<<" is Complete."<<endl;
-					address = OUTPUT2_START + (present_mac_row * buffer->weightsize.tuple[1] + present_v_fold * MAX_READ_INT) * UNIT_INT_BYTE;
+					address = OUTPUT_START + (present_mac_row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
 					dram->DRAMRequest(address, true);	
 					if (buffer->AuxAColEnd() && !buffer->AuxARowEnd())
 					{

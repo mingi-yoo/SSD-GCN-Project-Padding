@@ -24,7 +24,6 @@ private:
 	DRAMInterface *dram;
 	BufferInterface *buffer;
 	Accelerator *acc;
-	uint64_t cycle;
 };
 
 #endif

@@ -6,13 +6,15 @@
 
 using namespace std;
 
+uint64_t cycle;
+
 SSDGCNSim::SSDGCNSim(IniParser *iniparser, DataReader *datareader) {
     buffer = new BufferInterface(iniparser->axbuffer,
                                  iniparser->weightbuffer,
                                  iniparser->outputbuffer,
                                  datareader);
 
-  	dram = new DRAMInterface("ini/DDR3_micron_32M_8B_x8_sg15.ini", 
+  	dram = new DRAMInterface("ini/DDR3_micron_64M_8B_x4_sg15.ini", 
                              "system.ini", 
                              "./DRAMSim2/", 
                              "SSDGCNSim", 
@@ -22,7 +24,7 @@ SSDGCNSim::SSDGCNSim(IniParser *iniparser, DataReader *datareader) {
 
     acc = new Accelerator(iniparser->accdimension, dram, buffer);
     
-    cycle = 0;
+
   }
 
 SSDGCNSim::~SSDGCNSim() {
