@@ -329,7 +329,7 @@ void Accelerator::MACControllerRun()
 					address = OUTPUT_START + (present_mac_row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
 					cout<<":MAC1 Running... Row: "<<present_mac_row<<" is zero row..."<<endl;
 					dram->DRAMRequest(address, true);
-					if (buffer->AuxXRowEnd())
+					if (buffer->AuxXRowEnd() || buffer->ShedRow(false) != 0)
 						buffer->isready = false;
 					return;
 				}
@@ -381,7 +381,7 @@ void Accelerator::MACControllerRun()
 					address = OUTPUT_START + (present_mac_row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
 					dram->DRAMRequest(address, true);
 					cout<<"MAC2 is running ... row "<<present_mac_col<<" is zero"<<endl;
-					if (buffer->AuxARowEnd())
+					if (buffer->AuxARowEnd() || buffer->ShedRow(true) != 0)
 						buffer->isready = false;
 					return;
 				}

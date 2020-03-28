@@ -279,6 +279,7 @@ uint64_t BufferInterface::ReadMACData(Type iswhat)
 				aux_present.rowindex++;
 			ret = data->adjrowindex[aux_present.rowindex] - data->adjrowindex[aux_present.rowindex-1];
 			aux_present.rowindex++;
+			shed_row = aux_present.rowindex;
 			aux_axbuffer.remain_space += UNIT_INT_BYTE;
 			if (aux_present.rowindex > aux_axbuffer.rowindex)
 				aux_flag.a_row = false;
@@ -295,6 +296,7 @@ uint64_t BufferInterface::ReadMACData(Type iswhat)
 				aux_present.rowindex++;
 			ret = data->ifrowindex[aux_present.rowindex] - data->ifrowindex[aux_present.rowindex-1];
 			aux_present.rowindex++;
+			shed_row = aux_present.rowindex;
 			aux_axbuffer.remain_space += UNIT_INT_BYTE;
 			if (aux_present.rowindex > aux_axbuffer.rowindex)
 				aux_flag.x_row = false;
@@ -302,6 +304,15 @@ uint64_t BufferInterface::ReadMACData(Type iswhat)
 	}
 
 	return ret;
+}
+
+uint64_t BufferInterface::ShedRow(bool isA) // Give hint to MACController
+{
+	uint64_t ret;
+	if (!isA)
+		ret = data->ifrowindex[shed_row] - data->ifrowindex[shed_row-1];
+	else
+		ret = data->adjrowindex[shed_row] - data->adjrowindex[shed_row-1];
 }
 
 float BufferInterface::ReadValMACData()
