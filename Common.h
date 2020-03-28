@@ -11,18 +11,17 @@
 
 using namespace std;
 
-uint64_t MAX_READ_BYTE; 
-uint64_t MAX_READ_INT; 
-uint64_t UNIT_INT_BYTE; 
+extern uint64_t MAX_READ_BYTE; 
+extern uint64_t MAX_READ_INT; 
+extern uint64_t UNIT_INT_BYTE; 
 
-uint64_t A_COL_START;  
-uint64_t A_ROW_START;  
-uint64_t X_VAL_START;  
-uint64_t X_COL_START;  
-uint64_t X_ROW_START;  
-uint64_t WEIGHT_START; 
-uint64_t OUTPUT_START; 
-uint64_t OUTPUT2_START; 
+extern uint64_t A_COL_START;  
+extern uint64_t A_ROW_START;  
+extern uint64_t X_VAL_START;  
+extern uint64_t X_COL_START;  
+extern uint64_t X_ROW_START;  
+extern uint64_t WEIGHT_START; 
+extern uint64_t OUTPUT_START;
 
 enum Type {A_COL, A_ROW, X_VAL, X_COL, X_ROW, WEIGHT, OUTPUT};
 

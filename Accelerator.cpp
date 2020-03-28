@@ -8,6 +8,18 @@ using namespace std;
 
 extern uint64_t cycle;
 
+uint64_t MAX_READ_BYTE; 
+uint64_t MAX_READ_INT; 
+uint64_t UNIT_INT_BYTE; 
+
+uint64_t A_COL_START;  
+uint64_t A_ROW_START;  
+uint64_t X_VAL_START;  
+uint64_t X_COL_START;  
+uint64_t X_ROW_START;  
+uint64_t WEIGHT_START; 
+uint64_t OUTPUT_START;
+
 Accelerator::Accelerator(uint64_t accdimension, DRAMInterface *dram_, BufferInterface *buffer_) 
 {
 	num_of_pe = accdimension;

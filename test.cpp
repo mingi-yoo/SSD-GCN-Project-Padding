@@ -29,9 +29,7 @@ void print_initialize(IniParser *i, DataReader *d) {
 	cout << "axbuffer : " << i->axbuffer << endl;
 	cout << "weightbuffer : " << i->weightbuffer << endl;
 	cout << "outputbuffer : " << i->outputbuffer << endl;
-	cout << "ramqueue : " << i->ramqueue << endl;
 	cout << "accdimension : " << i->accdimension << endl;
-	cout << "membandwidth : " << i->membandwidth << endl;
 	cout << "clk_period_in_ns : " << i->clk_period_in_ns << endl;
 	cout << "outputfilename : " << i->outputfilename << endl;
 	cout << endl;
