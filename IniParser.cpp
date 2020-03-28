@@ -96,7 +96,7 @@ int IniParser::GetInt(string name)
 uint64_t IniParser::GetUint64(string name)
 {
 	if (Contain(name))
-		return stoull(m_table[name]);
+		return stoull(m_table[name], NULL, 0);
 	else
 		throw invalid_argument("Not exist.");
 }

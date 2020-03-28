@@ -113,10 +113,13 @@ void Accelerator::RequestControllerRun()
 	{
 		Request(A_ROW);
 		buffer->present_ax_req += MAX_READ_BYTE;
-		flag.a_row_req = false;
-		flag.a_col_req = true;
+		if (!buffer->AColEnd())
+		{
+			flag.a_row_req = false;
+			flag.a_col_req = true;
+		}
 	}
-	else if (flag.a_col_req)
+	else if (flag.a_col_req && flag.ax_req_ok)
 	{
 		Request(A_COL);
 		buffer->present_ax_req += MAX_READ_BYTE;
@@ -138,9 +141,12 @@ void Accelerator::RequestControllerRun()
 	{
 		Request(X_ROW);
 		buffer->present_ax_req += MAX_READ_BYTE;
-		flag.x_row_req = false;
-		flag.x_col_req = true;
-		flag.x_val_req = true;
+		if (!buffer->XColEnd() && !buffer->XValEnd())
+		{
+			flag.x_row_req = false;
+			flag.x_col_req = true;
+			flag.x_val_req = true;
+		}
 	}
 	else if (flag.x_col_req && flag.x_val_req && flag.ax_req_ok)
 	{
@@ -182,14 +188,16 @@ void Accelerator::RequestControllerRun()
 			{
 				if (buffer->IsFilled(X_ROW))
 				{
-					while (remain_col_num == 0 && buffer->IsFilled(X_ROW))
+					if (remain_col_num == 0 && buffer->IsFilled(X_ROW))
 					{
 						remain_col_num = buffer->PopData(X_ROW);
-					}
-					if (remain_col_num == 0 && !buffer->IsFilled(X_ROW) && !buffer->XRowEnd())
-					{
-						flag.x_row_req = true;
-						flag.weight_req = false;
+						if (remain_col_num == 0 && buffer->IsFilled(X_ROW))
+							flag.weight_req = true;
+						else if (remain_col_num == 0 && !buffer->IsFilled(X_ROW) && !buffer->XRowEnd())
+						{
+							flag.x_row_req = true;
+							flag.weight_req = false;
+						}
 					}
 				}
 				else if (!buffer->XRowEnd())
@@ -229,14 +237,16 @@ void Accelerator::RequestControllerRun()
 			{
 				if (buffer->IsFilled(A_ROW))
 				{
-					while (remain_col_num == 0 && buffer->IsFilled(A_ROW))
+					if (remain_col_num == 0 && buffer->IsFilled(A_ROW))
 					{
 						remain_col_num = buffer->PopData(A_ROW);
-					}
-					if (remain_col_num == 0 && !buffer->IsFilled(A_ROW) && !buffer->ARowEnd())
-					{
-						flag.a_row_req = true;
-						flag.weight_req = false;
+						if (remain_col_num == 0 && buffer->IsFilled(A_ROW))
+							flag.weight_req = false;
+						else if (remain_col_num == 0 && !buffer->IsFilled(A_ROW) && !buffer->ARowEnd())
+						{
+							flag.a_row_req = true;
+							flag.weight_req = false;
+						}
 					}
 				}
 				else if (!buffer->ARowEnd())
@@ -272,12 +282,12 @@ void Accelerator::RequestControllerRun()
 				if (remain_col_num == 0)
 				{
 					remain_col_num = buffer->PopData(X_ROW);
-				}
-				else
-				{
-					flag.weight_req = true;
-					flag.x_col_req = false;
-					flag.x_val_req = false;
+					if (remain_col_num != 0)
+					{
+						flag.weight_req = true;
+						flag.x_col_req = false;
+						flag.x_val_req = false;
+					}
 				}
 			}
 		}
@@ -288,11 +298,11 @@ void Accelerator::RequestControllerRun()
 				if (remain_col_num == 0)
 				{
 					remain_col_num = buffer->PopData(A_ROW);
-				}
-				else
-				{
-					flag.weight_req = true;
-					flag.a_col_req = false;
+					if (remain_col_num != 0)
+					{
+						flag.weight_req = true;
+						flag.a_col_req = false;
+					}
 				}
 			}
 		}
@@ -348,11 +358,13 @@ void Accelerator::MACControllerRun()
 					cout<<"Row "<<present_mac_row<<" is Complete."<<endl;
 					address = OUTPUT_START + (present_mac_row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
 					dram->DRAMRequest(address, true);
+					/*
 					if (buffer->AuxXValEnd() && buffer->AuxXColEnd() && !buffer->AuxXRowEnd())
 					{
 						while (!buffer->AuxXRowEnd())
 							buffer->ReadMACData(X_ROW);
-					}				
+					}
+					*/				
 				}
 			}
 		}
@@ -396,11 +408,13 @@ void Accelerator::MACControllerRun()
 					cout<<"Row "<<present_mac_row<<" is Complete."<<endl;
 					address = OUTPUT_START + (present_mac_row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
 					dram->DRAMRequest(address, true);	
+					/*
 					if (buffer->AuxAColEnd() && !buffer->AuxARowEnd())
 					{
 						while (!buffer->AuxARowEnd())
 							buffer->ReadMACData(A_ROW);
-					}				
+					}
+					*/				
 				}
 			}
 		}
