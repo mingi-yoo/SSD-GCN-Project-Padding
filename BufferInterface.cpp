@@ -290,7 +290,7 @@ uint64_t BufferInterface::ReadMACData(Type iswhat)
 			if (aux_present.colindex > aux_axbuffer.colindex)
 				aux_flag.x_col = false;
 			break;
-		case X_ROW:
+		case X_ROW:;
 			if (aux_present.rowindex == 0)
 				aux_present.rowindex++;
 			ret = data->ifrowindex[aux_present.rowindex] - data->ifrowindex[aux_present.rowindex-1];
