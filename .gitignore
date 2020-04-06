@@ -37,4 +37,5 @@
 *.po
 *.log
 .DS_Store
-sim
+sim # executable
+*.txt # data file
