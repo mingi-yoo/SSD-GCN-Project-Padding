@@ -6,12 +6,39 @@
 
 using namespace std;
 
+extern char *optarg;
+
 void print_initialize(IniParser *i, DataReader *d);
 
 int main(int argc, char** argv)
 {
-	IniParser *iniparser = new IniParser("start.ini");
-	DataReader *datareader = new DataReader("data.txt");
+	int option = 0;
+	string ini;
+	string data;
+	
+	if (argc == 1)
+	{
+		cout<<"You must follow this form: \'./sim -i inifile_path -d datafile_path\'"<<endl;
+		return 0;
+	}
+
+	while ((option = getopt(argc, argv, "i:d:")) != EOF)
+	{
+		switch (option)
+		{
+			case 'i':
+				ini = optarg;
+				break;
+			case 'd':
+				data = optarg;
+				break;
+			case '?':
+				cout<<"You must follow this form: \'./sim -i inifile_path -d datafile_path\'"<<endl;
+				return 0;
+		}
+	}
+	IniParser *iniparser = new IniParser(ini);
+	DataReader *datareader = new DataReader(data);
 
 	print_initialize(iniparser,datareader);
 

@@ -35,7 +35,11 @@ BufferInterface::BufferInterface(uint64_t axbuffersize,
 	this->axbuffersize = axbuffersize;
 	this->weightbuffersize = weightbuffersize;
 
+	mac1_count = data_->ifrowindex.size() - 1;
+	mac2_count = data_->adjrowindex.size() - 1;
+
 	present_ax_req = 0;
+	present_w_req = 0;
 
 	flag = {false, false, false, false, false, false, false};
 	aux_flag = {false, false, false, false, false, false, false};
@@ -101,13 +105,22 @@ void BufferInterface::FillBuffer(uint64_t address, Type iswhat)
 			flag.x_row = true;
 			break;
 		case WEIGHT:
-			uint64_t row = address / (UNIT_INT_BYTE * weightsize.tuple[1]);
-			uint64_t col = (address - row * weightsize.tuple[1] * UNIT_INT_BYTE) / UNIT_INT_BYTE;
-			Tuple insert = {{row, col}};
-			weightbuffer.active.push_back(insert);
-			if(weightbuffer.remain_space >= MAX_READ_BYTE) // 꽉 차기 전까지만
-				weightbuffer.remain_space -= MAX_READ_BYTE;
-			flag.weight = true;
+			vector<WB_Data>::iterator iter;
+			bool isWork = false; // 정상적으로 작동했는지 확인용
+
+			for(iter = weightbuffer.request.begin(); iter != weightbuffer.request.end(); iter++)
+			{
+				if(iter->address == address)
+				{
+					WB_Data t = {address, iter->req};
+					weightbuffer.active.push_back(t);
+					weightbuffer.request.erase(iter);
+					flag.weight = true;
+					isWork = true;
+					break;
+				}
+			}
+			assert(isWork);
 			break;
 	}
 }
@@ -165,9 +178,23 @@ bool BufferInterface::AuxIsFilled(Type iswhat)
 		case X_ROW:
 			ret = aux_flag.x_row;
 			break;
+		case WEIGHT:
+			if (aux_axbuffer.w_addr.size() != 0)
+				ret = true;
+			else
+				ret = false;
+			break;
 	}
 
 	return ret;
+}
+
+bool BufferInterface::AuxIsFulled(bool isweight)
+{
+	if (!isweight)
+		return (aux_axbuffer.remain_space == 0);
+	else
+		return (aux_axbuffer.remain_space <= UNIT_INT_BYTE);
 }
 
 void BufferInterface::Reset()
@@ -183,6 +210,14 @@ void BufferInterface::Reset()
 	aux_axbuffer.valindex = 0;
 	aux_axbuffer.colindex = 0;
 	aux_axbuffer.rowindex = 0;
+
+	present_ax_req = 0;
+	
+	weightbuffer.remain_space = weightbuffersize;
+	weightbuffer.active.clear();
+	weightbuffer.expire.clear();
+	weightbuffer.request.clear();
+	present_w_req = 0;
 
 	flag = {false, false, false, false, false, false, false};
 	aux_flag = {false, false, false, false, false, false, false};
@@ -201,6 +236,7 @@ uint64_t BufferInterface::PopData(Type iswhat)
 		case A_COL:
 			aux_axbuffer.colindex = present.colindex;
 			ret = data->adjcolindex[present.colindex];
+			cout << "A_COL Popped (value : " <<dec<< ret << ")" << endl;
 			axbuffer.remain_space += UNIT_INT_BYTE;
 			aux_axbuffer.remain_space -= UNIT_INT_BYTE;
 			present.colindex++;
@@ -213,6 +249,7 @@ uint64_t BufferInterface::PopData(Type iswhat)
 				present.rowindex++;
 			aux_axbuffer.rowindex = present.rowindex;
 			ret = data->adjrowindex[present.rowindex] - data->adjrowindex[present.rowindex-1];
+			cout << "A_ROW Popped (value : " <<dec<< ret << ")" << endl;
 			axbuffer.remain_space += UNIT_INT_BYTE;
 			aux_axbuffer.remain_space -= UNIT_INT_BYTE;
 			present.rowindex++;
@@ -223,6 +260,7 @@ uint64_t BufferInterface::PopData(Type iswhat)
 		case X_COL:
 			aux_axbuffer.colindex = present.colindex;
 			ret = data->ifcolindex[present.colindex];
+			cout << "X_COL Popped (value : " <<dec<<ret << ")" << endl;
 			axbuffer.remain_space += UNIT_INT_BYTE;
 			aux_axbuffer.remain_space -= UNIT_INT_BYTE;
 			present.colindex++;
@@ -235,6 +273,7 @@ uint64_t BufferInterface::PopData(Type iswhat)
 				present.rowindex++;
 			aux_axbuffer.rowindex = present.rowindex;
 			ret = data->ifrowindex[present.rowindex] - data->ifrowindex[present.rowindex-1];
+			cout << "X_ROW Popped (value : " <<dec<< ret << ")" << endl;
 			axbuffer.remain_space += UNIT_INT_BYTE;
 			aux_axbuffer.remain_space -= UNIT_INT_BYTE;
 			present.rowindex++;
@@ -269,6 +308,7 @@ uint64_t BufferInterface::ReadMACData(Type iswhat)
 	{
 		case A_COL:
 			ret = data->adjcolindex[aux_present.colindex];
+			cout << "Aux A_COL Popped (value : "<<dec<< ret << ")" << endl;
 			aux_present.colindex++;
 			aux_axbuffer.remain_space += UNIT_INT_BYTE;
 			if (aux_present.colindex > aux_axbuffer.colindex)
@@ -278,25 +318,26 @@ uint64_t BufferInterface::ReadMACData(Type iswhat)
 			if (aux_present.rowindex == 0)
 				aux_present.rowindex++;
 			ret = data->adjrowindex[aux_present.rowindex] - data->adjrowindex[aux_present.rowindex-1];
+			cout << "Aux A_ROW Popped (value : "<<dec<< ret << ")" << endl;
 			aux_present.rowindex++;
-			shed_row = aux_present.rowindex;
 			aux_axbuffer.remain_space += UNIT_INT_BYTE;
 			if (aux_present.rowindex > aux_axbuffer.rowindex)
 				aux_flag.a_row = false;
 			break;			
 		case X_COL:
 			ret = data->ifcolindex[aux_present.colindex];
+			cout << "Aux X_COL Popped (value : "<<dec<< ret << ")" << endl;
 			aux_present.colindex++;
 			aux_axbuffer.remain_space += UNIT_INT_BYTE;
 			if (aux_present.colindex > aux_axbuffer.colindex)
 				aux_flag.x_col = false;
 			break;
-		case X_ROW:;
+		case X_ROW:
 			if (aux_present.rowindex == 0)
 				aux_present.rowindex++;
 			ret = data->ifrowindex[aux_present.rowindex] - data->ifrowindex[aux_present.rowindex-1];
+			cout << "Aux X_ROW Popped (value : "<<dec<< ret << ")" << endl;
 			aux_present.rowindex++;
-			shed_row = aux_present.rowindex;
 			aux_axbuffer.remain_space += UNIT_INT_BYTE;
 			if (aux_present.rowindex > aux_axbuffer.rowindex)
 				aux_flag.x_row = false;
@@ -306,33 +347,34 @@ uint64_t BufferInterface::ReadMACData(Type iswhat)
 	return ret;
 }
 
-uint64_t BufferInterface::ShedRow(bool isA) // Give hint to MACController
-{
-	uint64_t ret;
-	if (!isA)
-		ret = data->ifrowindex[shed_row] - data->ifrowindex[shed_row-1];
-	else
-		ret = data->adjrowindex[shed_row] - data->adjrowindex[shed_row-1];
-}
-
 float BufferInterface::ReadValMACData()
 {
 	float ret;
 
 	ret = data->ifvalue[aux_present.valindex];
 	aux_present.valindex++;
+	aux_axbuffer.remain_space += UNIT_INT_BYTE;
 	if (aux_present.valindex > aux_axbuffer.valindex)
 		aux_flag.x_val = false;
 	
 	return ret;
 }
-void BufferInterface::ClearMACData(bool rowtoo)
+
+Tuple BufferInterface::ReadWeightTuple()
 {
-	log = aux_present;
-	if (rowtoo)
-		aux_axbuffer.remain_space = aux_axbuffer.size;
-	else
-		aux_axbuffer.remain_space = aux_axbuffer.size - UNIT_INT_BYTE;
+	Tuple ret;
+	vector<Tuple>::iterator iter = aux_axbuffer.w_addr.begin();
+	ret = aux_axbuffer.w_addr.front();
+	aux_axbuffer.w_addr.erase(iter);
+	aux_axbuffer.remain_space += UNIT_INT_BYTE * 2;
+
+	return ret;
+}
+
+void BufferInterface::PassWeightAddress(uint64_t w_start_addr, uint64_t w_end_addr)
+{
+	aux_axbuffer.w_addr.push_back({w_start_addr, w_end_addr});
+	aux_axbuffer.remain_space -= 2 * UNIT_INT_BYTE;
 }
 
 bool BufferInterface::XEnd()
@@ -346,7 +388,6 @@ bool BufferInterface::XEnd()
 		aux_present.colindex >= data->ifcolindex.size() &&
 		aux_present.valindex >= data->ifvalue.size())
 	{
-		isA = true;
 		return true;
 	}
 	else
@@ -449,22 +490,34 @@ bool BufferInterface::AuxAColEnd()
 		return false;
 }
 /* weight buffer 를 위한 함수들
-
-  canRequest() : request를 보낼 수 있는 상태인지 확인
-  IsExist() : weight data를 request하기 전에 해당 data가 버퍼내부에 있는지 확인
-  MACEnd() : active에 속한 data들이 계산을 마치고 expire로 이동하게 하는 함수
-  expire() : active내의 데이터 중 특정 address 의 data만 expire시키고 싶을 때 쓸 수 있는 함수
-
+*
+* canRequest() : request를 보낼 수 있는 상태인지 확인
+* Request() : request 보낸 데이터들 목록 관리
+* Requested() : 아직 버퍼에는 없지만 이미 request요청이 간 데이터인지 확인 (중복 request 방지)
+* IsExist() : weight data를 request하기 전에 해당 data가 버퍼내부에 있는지 확인
+* expire() : active내의 데이터 중 특정 address 의 data만 expire시키고 싶을 때 쓸 수 있는 함수
+*
 */
+bool BufferInterface::isReady(uint64_t address)
+{
+	vector<WB_Data>::iterator iter;
+	for(iter = weightbuffer.active.begin(); iter != weightbuffer.active.end(); iter++)
+	{
+	    if(iter->address == address)
+	        return true;
+	}
+	return false;
+}
 bool BufferInterface::canRequest()
 {
-	if(weightbuffer.remain_space >= MAX_READ_BYTE) // 버퍼가 아직 다 안채워진 경우 -> 가능
+	if(weightbuffersize - present_w_req >= MAX_READ_BYTE) // 버퍼가 아직 다 안채워진 경우 -> 가능
 	{
 		return true;
 	}
 	else if(!weightbuffer.expire.empty()) // 버퍼 내에 삭제 가능한 데이터가 있는 경우 -> 가능
 	{
 		weightbuffer.expire.erase(weightbuffer.expire.begin());
+		present_w_req -= MAX_READ_BYTE;
 		return true;
 	}
 	else // 모든 데이터가 사용중이므로 request 불가?
@@ -473,28 +526,55 @@ bool BufferInterface::canRequest()
 	}
 }
 
-bool BufferInterface::isExist(uint64_t address) // for weight address
+void BufferInterface::Request(uint64_t address)
 {
-	// weight address인 경우만 취급 // 일단 두번째 mac에 대해서는 고려하지 않음
+	WB_Data t = {address, 1};
+	weightbuffer.request.push_back(t);
+	present_w_req += MAX_READ_BYTE;
+}
 
-	uint64_t row = address / (UNIT_INT_BYTE * weightsize.tuple[1]);
-	uint64_t col = (address - row * weightsize.tuple[1] * UNIT_INT_BYTE) / UNIT_INT_BYTE;
-
-	for(Tuple t : weightbuffer.active) // 이 for문은 생략 가능할 수 있음 (나중에 확인 / 생각 좀 해봄)
+bool BufferInterface::Requested(uint64_t address)
+{
+	if(!weightbuffer.request.empty())
 	{
-		if (t.tuple[0] == row && t.tuple[1] == col) // hit
+		vector<WB_Data>::iterator iter;
+		for(iter = weightbuffer.request.begin(); iter != weightbuffer.request.end(); iter++)
 		{
-			return true;
+			if(iter->address == address) // already requested
+			{
+				iter->req += 1;
+				return true;
+			}
 		}
 	}
-	vector<Tuple>::iterator iter;
-	for(iter = weightbuffer.expire.begin(); iter != weightbuffer.expire.end(); iter++) {
-		if (iter->tuple[0] == row && iter->tuple[1] == col) // hit
+	
+	return false;
+}
+
+bool BufferInterface::isExist(uint64_t address) // for weight address
+{
+	vector<WB_Data>::iterator iter;
+	if(!weightbuffer.active.empty())
+	{
+		for(iter = weightbuffer.active.begin(); iter != weightbuffer.active.end(); iter++)
 		{
-			Tuple t = {{iter->tuple[0], iter->tuple[1]}};
-			weightbuffer.active.push_back(t);
-			weightbuffer.expire.erase(iter);
-			return true;
+			if (iter->address == address) // hit
+			{
+				iter->req += 1;
+				return true;
+			}
+		}
+	}
+	if(!weightbuffer.expire.empty())
+	{
+		for(iter = weightbuffer.expire.begin(); iter != weightbuffer.expire.end(); iter++) {
+			if (iter->address == address) // hit
+			{
+				WB_Data t = {address, 1};
+				weightbuffer.active.push_back(t);
+				weightbuffer.expire.erase(iter);
+				return true;
+			}
 		}
 	}
 
@@ -502,29 +582,29 @@ bool BufferInterface::isExist(uint64_t address) // for weight address
 	return false;
 }
 
-void BufferInterface::MACEnd() // 계산 끝나면 실행시켜 줘야됨
-{
-	for(Tuple t : weightbuffer.active)
-		weightbuffer.expire.push_back(t);
-	weightbuffer.active.clear();
-}
-
 bool BufferInterface::Expire(uint64_t address) // 특정 address만 expire하기 위한 용도
 {
-
-	uint64_t row = address / (UNIT_INT_BYTE * weightsize.tuple[1]);
-	uint64_t col = (address - row * weightsize.tuple[1] * UNIT_INT_BYTE) / UNIT_INT_BYTE;
-
-	vector<Tuple>::iterator iter;
-	for(iter = weightbuffer.active.begin(); iter != weightbuffer.active.end(); iter++) {
-		if (iter->tuple[0] == row && iter->tuple[1] == col)
-		{
-			Tuple t = {{iter->tuple[0], iter->tuple[1]}};
-			weightbuffer.expire.push_back(t);
-			weightbuffer.active.erase(iter);
-			return true;
+	if(!weightbuffer.active.empty())
+	{
+		vector<WB_Data>::iterator iter;
+		for(iter = weightbuffer.active.begin(); iter != weightbuffer.active.end(); iter++) {
+			if (iter->address == address)
+			{
+				if(iter->req <= 1) // expire 됨
+				{
+					WB_Data t = {address, 0};
+					weightbuffer.expire.push_back(t);
+					weightbuffer.active.erase(iter);
+				}
+				else // 아직 남은 request 존재
+				{
+					iter->req -= 1;
+				}
+				return true;
+			}
 		}
 	}
+
 	return false;
 }
 
@@ -585,11 +665,11 @@ void BufferInterface::print_status()
 	}
 
 	cout << "buffer_WEIGHT : {";
-	for(Tuple t: weightbuffer.active) {
-		cout << "(" << t.tuple[0] << "," << t.tuple[1] << "), ";
+	for(WB_Data t: weightbuffer.active) {
+		cout << hex << t.address << dec << ", ";
 	}
-	for(Tuple t: weightbuffer.expire) {
-		cout << "(" << t.tuple[0] << "," << t.tuple[1] << "), ";
+	for(WB_Data t: weightbuffer.expire) {
+		cout << hex << t.address << dec << ", ";
 	}
 	cout << "}" << endl;
 

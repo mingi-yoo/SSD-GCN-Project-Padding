@@ -37,19 +37,20 @@ public:
 	Tuple weightsize;
 	uint64_t axbuffersize;
 	uint64_t weightbuffersize;
-	bool isready; //Weight가 버퍼에 들어온 경우
 	uint64_t present_ax_req; //현재 accelerator가 리퀘스트 한 정도
 	uint64_t present_w_req;
-	uint64_t shed_row;
+	uint64_t mac1_count;
+	uint64_t mac2_count;
+	bool isA;
 	BufferInterface(uint64_t axbuffersize, 
 					uint64_t weightbuffersize, 
 					uint64_t outputbuffersize,
 					DataReader *data_);
 	~BufferInterface();
 	void FillBuffer(uint64_t address, Type iswhat);
-	uint64_t ShedRow(bool isA);
 	bool IsFilled(Type iswhat);
 	bool AuxIsFilled(Type iswhat);
+	bool AuxIsFulled(bool isweight);
 	bool XEnd(); //MAC2로 넘어갈 준비가 되었는가
 	bool AEnd(); //모든 MAC이 끝났는가
 	bool XRowEnd();
@@ -62,16 +63,19 @@ public:
 	bool AuxXValEnd();
 	bool AuxARowEnd();
 	bool AuxAColEnd();
+	bool isReady(uint64_t address);
 	void Reset(); //다시 채우는 함수
 	uint64_t PopData(Type iswhat);
 	float PopValData();
 	uint64_t ReadMACData(Type iswhat);
 	float ReadValMACData();
-	void ClearMACData(bool rowtoo);
+	Tuple ReadWeightTuple();
+	void PassWeightAddress(uint64_t w_start_addr, uint64_t w_end_addr);
 	//weight용
 	bool canRequest();
-	bool isExist(uint64_t address); //weight or xw계산한 값 존재?
-	void MACEnd();
+	void Request(uint64_t address);
+	bool Requested(uint64_t address); // RequestController 에서만 사용되어야 함
+	bool isExist(uint64_t address); //weight 값 존재? (Request controller에서만 사용되어야 함)
 	bool Expire(uint64_t address);
 	//테스트용
 	void print_status();
@@ -91,7 +95,6 @@ private:
 	BufIndex aux_present; //두 번째 버퍼의 위치를 가리키는 인덱스
 	BufIndex log;
 	bool mac_start;
-	bool isA;
 	vector<uint64_t> adjcolindex;
 	vector<uint64_t> adjrowindex;
 	vector<float> ifvalue;
