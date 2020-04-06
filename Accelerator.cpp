@@ -18,8 +18,14 @@ Accelerator::Accelerator(uint64_t accdimension, DRAMInterface *dram_, BufferInte
 	x_row_addr = X_ROW_START;
 
 	w_fold = buffer_->weightsize.tuple[1]/MAX_READ_INT;
+	if (buffer_->weightsize.tuple[1] == w_fold * MAX_READ_BYTE && w_fold > 0)
+		w_fold--;
 	v_fold = MAX_READ_INT/accdimension;
+	if (MAX_READ_INT == v_fold * accdimension && v_fold > 1)
+		v_fold--;
 	v_fold_last = (buffer_->weightsize.tuple[1] - w_fold * MAX_READ_INT)/accdimension;
+	if ((buffer_->weightsize.tuple[1] - w_fold * MAX_READ_INT) == v_fold_last * accdimension && v_fold_last > 0)
+		v_fold_last--;
 	present_w_fold = 0;
 	present_v_fold = 0;
 	present_mac_row = -1;
@@ -27,6 +33,8 @@ Accelerator::Accelerator(uint64_t accdimension, DRAMInterface *dram_, BufferInte
 
 	dram = dram_;
 	buffer = buffer_;
+	buffer->mac1_count = buffer->mac1_count * (w_fold + 1);
+	buffer->mac2_count = buffer->mac2_count * (w_fold + 1);
 
 	remain_col_num = 0;
 	remain_mac_col = 0;
