@@ -190,7 +190,7 @@ void Accelerator::RequestControllerRun()
 				temp.check1 = true;
 			else
 				temp.check1 = false;
-			if (temp.w_start_addr == temp.w_end_addr)
+			if (temp.w_start_addr != temp.w_end_addr)
 			{
 				if (!buffer->isExist(temp.w_end_addr) && !buffer->Requested(temp.w_end_addr))
 					temp.check2 = true;
@@ -360,7 +360,7 @@ void Accelerator::RequestControllerRun()
 				temp.check1 = true;
 			else
 				temp.check1 = false;
-			if (temp.w_start_addr == temp.w_end_addr)
+			if (temp.w_start_addr != temp.w_end_addr)
 			{
 				if (!buffer->isExist(temp.w_end_addr) && !buffer->Requested(temp.w_end_addr))
 					temp.check2 = true;
@@ -528,7 +528,7 @@ void Accelerator::MACControllerRun()
 				macflag.v_fold_over = true;
 				macflag.second_get = true;
 				buffer->Expire(present.weight.tuple[0]);
-				if (present.weight.tuple[0] == present.weight.tuple[1])
+				if (present.weight.tuple[0] != present.weight.tuple[1])
 					buffer->Expire(present.weight.tuple[1]);
 				macflag.macisready = false;
 				if (remain_mac_col == 0)
@@ -585,6 +585,8 @@ void Accelerator::MACControllerRun()
 			{
 				macflag.fold_start = false;
 				present.weight = buffer->ReadWeightTuple();
+				if (present_mac_row == 21)
+					cout<<hex<<present.weight.tuple[0]<<" "<<hex<<present.weight.tuple[1]<<endl;
 				if (buffer->isReady(present.weight.tuple[0]) && buffer->isReady(present.weight.tuple[1]))
 					macflag.macisready = true;
 			}
@@ -609,7 +611,7 @@ void Accelerator::MACControllerRun()
 				macflag.v_fold_over = true;
 				macflag.second_get = true;
 				buffer->Expire(present.weight.tuple[0]);
-				if (present.weight.tuple[0] == present.weight.tuple[1])
+				if (present.weight.tuple[0] != present.weight.tuple[1])
 					buffer->Expire(present.weight.tuple[1]);
 				macflag.macisready = false;
 				if (remain_mac_col == 0)
