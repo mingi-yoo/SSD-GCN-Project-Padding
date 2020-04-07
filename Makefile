@@ -9,13 +9,13 @@ program := sim
 
 sources := $(wildcard *.cpp)
 objects := $(subst .cpp,.o,$(sources))
-dependencies := $(subst .cpp,.d,$(sources))
 
 dram_library := ./DRAMSim2/libdramsim.so
 LDLIBS := -ldramsim
 
 CXXFLAGS += -std=c++11 -Wall -g
 LDFLAGS += -L$(dir $(dram_library))
+include_dir := -soname
 
 CXX := g++
 RM := rm -f
@@ -52,20 +52,13 @@ $(program): $(dram_library) $(objects)
 $(dram_library):
 	$(MAKE) --directory=$(dir $@) $(notdir $@)
 
--include $(dependencies)
-
-%.d: %.cpp
-	$(CXX) -MM $< > $@
-
 %.o: %.cpp
 	$(COMPILE.cpp) $< -I$(dir $(dram_library))
-
-
 
 .PHONY: clean
 clean:
 	$(MAKE) --directory=$(dir $(dram_library)) clean
-	$(RM) $(objects) $(program) $(dependencies)
+	$(RM) $(objects) $(program)
 	$(RM) $(test_objects) $(test)
 
 

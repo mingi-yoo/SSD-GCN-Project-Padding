@@ -48,10 +48,8 @@ Accelerator::Accelerator(uint64_t accdimension, DRAMInterface *dram_, BufferInte
 	flag = {false, false, false, false, true, false, false, false, true, false, true, true, true};
 	endflag = {false, false, false, false, false};
 	macflag = {true, false, false, false, false, false};
-	reqflag = {false, false, false, false};
 	macover = false;
 	programover = false;
-	stop = false;
 	jc1 = false;
 	jc2 = false;
 }
@@ -70,11 +68,7 @@ bool Accelerator::Run()
 	bool ret;
 
 	ret = true;
-	/*
-	cout << buffer->ARowEnd()<<" "<<buffer->AColEnd()<<endl;
-	cout << buffer->AuxARowEnd()<<" "<<buffer->AuxAColEnd()<<endl;
-	cout<<"......................"<<endl;
-	*/
+
 	RequestControllerRun();
 	MACControllerRun();
 
@@ -136,575 +130,340 @@ void Accelerator::RequestControllerRun()
 {
 	if (programover)
 		return;
-	if (buffer->present_ax_req >= limit_ax_req)
+	if (flag.mac_1)
 	{
-		flag.ax_req_ok = false;
-	}
-	else
-	{
-		flag.ax_req_ok = true;
-	}
-	if (!buffer->canRequest())
-	{
-		flag.w_req_ok = false;
-	}
-	else
-	{
-		flag.w_req_ok = true;
-	}
-	if (flag.a_row_req && !buffer->IsFilled(A_ROW) && flag.ax_req_ok)
-	{
-		Request(A_ROW);
-		buffer->present_ax_req += MAX_READ_BYTE;
-		if (!endflag.a_col_end)
-		{
-			flag.a_row_req = false;
-			flag.a_col_req = true;
-		}
-	}
-	else if (flag.a_col_req && flag.ax_req_ok)
-	{
-		if (stop)
-		{
-			if (!buffer->AuxIsFulled(false))
-			{
-				remain_col_num = buffer->PopData(A_ROW);
-				present_row++;
-				flag.a_col_req = false;
-				stop = false;
-				return;
-			}
-			else
-			{
-				return;
-			}
-		}
-		Request(A_COL);
-		buffer->present_ax_req += MAX_READ_BYTE;
-		if (buffer->IsFilled(A_ROW) && buffer->IsFilled(A_COL) && flag.ax_req_ok)
-		{
-			if (remain_col_num == 0)
-			{
-				if (!buffer->AuxIsFulled(false))
-				{
-					remain_col_num = buffer->PopData(A_ROW);
-					present_row++;
-					flag.a_col_req = false;
-				}
-				else
-				{
-					stop = true;
-					return;
-				}
-			}
-			else
-			{
-				flag.weight_req = true;
-				flag.a_col_req = false;
-			}
-		}
-	}
-	else if (flag.x_row_req && !buffer->IsFilled(X_ROW) && flag.ax_req_ok)
-	{
-		Request(X_ROW);
-		buffer->present_ax_req += MAX_READ_BYTE;
-		if (!endflag.x_col_end && !endflag.x_val_end)
+		if (buffer->XRowEnd() && buffer->XColEnd() && buffer->XValEnd() && !flag.weight_uncompleted)
+			return;
+		if ((buffer->IsFilled(X_ROW) && buffer->IsFilled(X_COL) && buffer->IsFilled(X_VAL) && !flag.weight_uncompleted) ||
+			(remain_col_num != 0 && buffer->IsFilled(X_COL) && buffer->IsFilled(X_VAL) && !flag.weight_uncompleted))
 		{
 			flag.x_row_req = false;
-			flag.x_col_req = true;
-			flag.x_val_req = true;
+			flag.x_col_req = false;
+			flag.weight_req = true;
+			//cout<<"1"<<endl;
 		}
-	}
-	else if (flag.x_col_req && flag.x_val_req && flag.ax_req_ok)
-	{
-		if (stop)
+		if (flag.x_row_req && !endflag.x_row_end && ((buffer->present_ax_req + buffer->HowMuchAXFilled()) <= (limit_ax_req - MAX_READ_BYTE)))
 		{
-			if (!buffer->AuxIsFulled(false))
+			Request(X_ROW);
+			buffer->present_ax_req += MAX_READ_BYTE;
+			if (!endflag.x_col_end)
+			{
+				flag.x_row_req = false;
+				flag.x_col_req = true;
+				//cout<<"2"<<endl;
+			}
+		}
+		else if (flag.x_col_req && !endflag.x_col_end && ((buffer->present_ax_req + buffer->HowMuchAXFilled()) <= (limit_ax_req - 2 * MAX_READ_BYTE)))
+		{
+			Request(X_COL);
+			Request(X_VAL);
+			buffer->present_ax_req += 2 * MAX_READ_BYTE;
+			if (buffer->IsFilled(X_ROW) && buffer->IsFilled(X_COL) && buffer->IsFilled(X_VAL))
+			{
+				flag.x_col_req = false;
+				flag.weight_req = true;
+				//cout<<"3"<<endl;
+			}
+		}
+		else if (flag.weight_req && !buffer->AuxIsFulled())
+		{
+			if (remain_col_num == 0)
 			{
 				remain_col_num = buffer->PopData(X_ROW);
 				present_row++;
-				flag.x_col_req = false;
-				flag.x_val_req = false;
-				stop = false;
-				return;
-			}
-			else
-			{
-				return;
-			}
-		}
-		Request(X_COL);
-		Request(X_VAL);
-		buffer->present_ax_req += MAX_READ_BYTE;
-		buffer->present_ax_req += MAX_READ_BYTE;
-		if (buffer->IsFilled(X_ROW) && buffer->IsFilled(X_COL) && buffer->IsFilled(X_VAL))
-		{
-			if (remain_col_num == 0)
-			{
-				if (!buffer->AuxIsFulled(false))
+				//cout<<"4"<<endl;
+				if (remain_col_num == 0)
 				{
-					remain_col_num = buffer->PopData(X_ROW);
-					present_row++;
-					flag.x_col_req = false;
-					flag.x_val_req = false;
-				}
-				else
-				{
-					stop = true;
+					//cout<<"5"<<endl;
 					return;
 				}
 			}
+			//cout<<"6"<<endl;
+			present_col = buffer->PopData(X_COL);
+			buffer->PopValData();
+			remain_col_num--;
+			uint64_t address = WEIGHT_START + (present_col * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
+			temp.w_start_addr = address & mask;
+			temp.w_end_addr = (address + 63) & mask;
+			buffer->PassWeightAddress(temp.w_start_addr, temp.w_end_addr);
+			if (!buffer->isExist(temp.w_start_addr) && !buffer->Requested(temp.w_start_addr))
+				temp.check1 = true;
+			else
+				temp.check1 = false;
+			if (temp.w_start_addr == temp.w_end_addr)
+			{
+				if (!buffer->isExist(temp.w_end_addr) && !buffer->Requested(temp.w_end_addr))
+					temp.check2 = true;
+				else
+					temp.check2 = false;
+			}
+			else
+				temp.check2 = false;
+			if (temp.check1 && temp.check2 && buffer->canRequest(true))
+			{
+				RequestWeight(temp.w_start_addr);
+				RequestWeight(temp.w_end_addr);
+			}
+			else if (temp.check1 && buffer->canRequest(false))
+			{
+				RequestWeight(temp.w_start_addr);
+			}
+			else if (temp.check2 && buffer->canRequest(false))
+			{
+				RequestWeight(temp.w_end_addr);
+			}
 			else
 			{
-				flag.weight_req = true;
-				flag.x_col_req = false;
-				flag.x_val_req = false;
-			}
-		}
-	}
-	else if (flag.weight_req && flag.w_req_ok)
-	{
-		uint64_t address;
-		uint64_t w_start_addr;
-		uint64_t w_end_addr;
-
-		if (flag.mac_1)
-		{
-			if (stop)
-			{
-				if (!buffer->AuxIsFulled(false) && reqflag.label1)
+				if (temp.check1 || temp.check2)
 				{
-					present_col = buffer->PopData(X_COL);
-					remain_col_num--;
-					reqflag.label1 = false;
-					stop = false;
-					goto label1;
-				}
-				else if (!buffer->AuxIsFulled(false) && reqflag.label2)
-				{
-					buffer->PopValData();
-					reqflag.label2 = false;
-					stop = false;
-					goto label2;
-				}
-				else if (!buffer->AuxIsFulled(true) && reqflag.label3)
-				{
-					address = WEIGHT_START + (present_col * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
-					w_start_addr = address & mask;
-					w_end_addr = (address + 63) & mask;
-					buffer->PassWeightAddress(w_start_addr, w_end_addr);
-					reqflag.label3 = false;
-					stop = false;
-					goto label3;
-				}
-				else if (!buffer->AuxIsFulled(false) && reqflag.label4)
-				{
-					remain_col_num = buffer->PopData(X_ROW);
-					present_row++;
-					reqflag.label4 = false;
-					stop = false;
-					goto label4;
-				}
-				else
-				{
+					flag.weight_req = false;
+					flag.weight_uncompleted = true;
+					//cout<<"7"<<endl;
 					return;
 				}
-			}	
-			if (!buffer->AuxIsFulled(false))
-			{
-				present_col = buffer->PopData(X_COL);
-				remain_col_num--;
 			}
-			else
+			if (remain_col_num == 0 && !buffer->IsFilled(X_ROW) && !endflag.x_row_end)
 			{
-				stop = true;
-				reqflag.label1 = true;
-				return;
+				flag.weight_req = false;
+				flag.x_row_req = true;
+				//cout<<"8"<<endl;
 			}
-		label1:
-			if (!buffer->AuxIsFulled(false))
+			else if (!buffer->IsFilled(X_COL) && 
+					 !buffer->IsFilled(X_VAL) &&
+					 !endflag.x_col_end &&
+					 !endflag.x_row_end)
 			{
-				buffer->PopValData();
-			}
-			else
-			{
-				stop = true;
-				reqflag.label2 = true;
-				return;
-			}
-		label2:
-			if (!buffer->AuxIsFulled(true))
-			{
-				address = WEIGHT_START + (present_col * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
-				w_start_addr = address & mask;
-				w_end_addr = (address + 63) & mask;
-				buffer->PassWeightAddress(w_start_addr, w_end_addr);
-			}
-			else
-			{
-				stop = true;
-				reqflag.label3 = true;
-				return;
-			}
-		label3:
-			if (!buffer->isExist(w_start_addr) && !buffer->Requested(w_start_addr))
-			{
-				RequestWeight(w_start_addr);
-			}
-			if (!buffer->isExist(w_end_addr) && !buffer->Requested(w_end_addr))
-			{
-				RequestWeight(w_end_addr);
-			}
-			if (!buffer->XColEnd() && !buffer->XValEnd() && remain_col_num == 0)
-			{
-				if (buffer->IsFilled(X_ROW))
-				{
-					if (!buffer->AuxIsFulled(false))
-					{
-						remain_col_num = buffer->PopData(X_ROW);
-						present_row++;
-					}
-					else
-					{
-						stop = true;
-						reqflag.label4 = true;
-						return;
-					}
-				label4:
-					if (remain_col_num == 0 && buffer->IsFilled(X_ROW))
-					{
-						flag.weight_req = false;	
-					}
-					else if (remain_col_num == 0 && !buffer->IsFilled(X_ROW) && !endflag.x_row_end)
-					{
-						flag.x_row_req = true;
-						flag.weight_req = false;
-					}
-				}
-				else if (!endflag.x_row_end)
-				{
-					flag.x_row_req = true;
-					flag.weight_req = false;
-				}
-				else
-				{
-					flag.weight_req = false;
-				}
-			}
-			else if (!buffer->IsFilled(X_COL) && !buffer->IsFilled(X_VAL) && !endflag.x_col_end && !endflag.x_val_end)
-			{
+				flag.weight_req = false;
 				flag.x_col_req = true;
-				flag.x_val_req = true;
-				flag.weight_req = false;
+				//cout<<"9"<<endl;
 			}
-			else if (buffer->XColEnd() && buffer->XValEnd() && remain_col_num == 0)
+			else if ((remain_col_num == 0 && 
+					 !buffer->IsFilled(X_ROW) && 
+					 endflag.x_row_end &&
+					 buffer->IsFilled(X_COL) &&
+					 buffer->IsFilled(X_VAL)) ||
+					 (buffer->XRowEnd() &&
+					 buffer->XColEnd() &&
+					 buffer->XValEnd()))
 			{
 				flag.weight_req = false;
-				if (!buffer->XRowEnd())
+				//cout<<"10"<<endl;
+			}
+		}
+		else if (flag.weight_uncompleted)
+		{
+			if (temp.check1 && temp.check2 && buffer->canRequest(true))
+			{
+				RequestWeight(temp.w_start_addr);
+				RequestWeight(temp.w_end_addr);
+				flag.weight_uncompleted = false;
+				temp.check1 = false;
+				temp.check2 = false;
+			}
+			else if (temp.check1 && buffer->canRequest(false))
+			{
+				RequestWeight(temp.w_start_addr);
+				flag.weight_uncompleted = false;
+				temp.check1 = false;
+			}
+			else if (temp.check2 && buffer->canRequest(false))
+			{
+				RequestWeight(temp.w_end_addr);
+				flag.weight_uncompleted = false;
+				temp.check2 = false;
+			}
+			if (!flag.weight_uncompleted)
+			{
+				if (remain_col_num == 0 && !buffer->IsFilled(X_ROW) && !endflag.x_row_end)
 				{
-					if (!buffer->AuxIsFulled(false))
-					{
-						buffer->PopData(X_ROW);
-						present_row++;
-					}
-					else
-					{
-						stop = true;
-						return;
-					}
+					flag.weight_req = false;
+					flag.x_row_req = true;
+					//cout<<"11"<<endl;
+				}
+				else if (!buffer->IsFilled(X_COL) && 
+						 !buffer->IsFilled(X_VAL) &&
+						 !endflag.x_col_end &&
+						 !endflag.x_row_end)
+				{
+					flag.weight_req = false;
+					flag.x_col_req = true;
+					//cout<<"12"<<endl;
+				}
+				else if ((remain_col_num == 0 && 
+						 !buffer->IsFilled(X_ROW) && 
+						 endflag.x_row_end &&
+						 buffer->IsFilled(X_COL) &&
+						 buffer->IsFilled(X_VAL)) ||
+						 (buffer->XRowEnd() &&
+						 buffer->XColEnd() &&
+						 buffer->XValEnd()))
+				{
+					flag.weight_req = false;
+					//cout<<"13"<<endl;
 				}
 			}
 		}
 		else
 		{
-			if (stop)
-			{
-				if (!buffer->AuxIsFulled(false) && reqflag.label1)
-				{
-					present_col = buffer->PopData(A_COL);
-					remain_col_num--;
-					reqflag.label1 = false;
-					stop = false;
-					goto label5;
-				}
-				else if (!buffer->AuxIsFulled(true) && reqflag.label2)
-				{
-					address = OUTPUT_START + (present_col * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
-					w_start_addr = address & mask;
-					w_end_addr = (address + 63) & mask;
-					buffer->PassWeightAddress(w_start_addr, w_end_addr);
-					reqflag.label2 = false;
-					stop = false;
-					goto label6;
-				}
-				else if (!buffer->AuxIsFulled(false) && reqflag.label3)
-				{
-					remain_col_num = buffer->PopData(A_ROW);
-					present_row++;
-					reqflag.label3 = false;
-					stop = false;
-					goto label7;
-				}
-				else
-				{
-					return;
-				}
-			}
-			if (!buffer->AuxIsFulled(false))
-			{
-				present_col = buffer->PopData(A_COL);
-				remain_col_num--;
-			}
-			else
-			{
-				stop = true;
-				reqflag.label1 = true;
-				return;
-			}
-		label5:
-			if (!buffer->AuxIsFulled(true))
-			{
-				address = OUTPUT_START + (present_col * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
-				w_start_addr = address & mask;
-				w_end_addr = (address + 63) & mask;
-				buffer->PassWeightAddress(w_start_addr, w_end_addr);
-			}
-			else
-			{
-				stop = true;
-				reqflag.label2 = true;
-				return;
-			}
-		label6:
-			if (!buffer->isExist(w_start_addr) && !buffer->Requested(w_start_addr))
-			{
-				RequestWeight(w_start_addr);
-			}
-			if (!buffer->isExist(w_end_addr) && !buffer->Requested(w_end_addr))
-			{
-				RequestWeight(w_end_addr);
-			}
-			if (!buffer->AColEnd() && remain_col_num == 0)
-			{
-				if (buffer->IsFilled(A_ROW))
-				{
-					if (!buffer->AuxIsFulled(false))
-					{
-						remain_col_num = buffer->PopData(A_ROW);
-						present_row++;
-					}
-					else
-					{
-						stop = true;
-						reqflag.label3 = true;
-						return;
-					}
-				label7:
-					if (remain_col_num == 0 && buffer->IsFilled(A_ROW))
-						flag.weight_req = false;
-					else if (remain_col_num == 0 && !buffer->IsFilled(A_ROW) && !endflag.a_row_end)
-					{
-						flag.a_row_req = true;
-						flag.weight_req = false;
-					}
-				}
-				else if (!endflag.a_row_end)
-				{
-					flag.a_row_req = true;
-					flag.weight_req = false;
-				}
-				else
-				{
-					flag.weight_req = false;
-				}
-			}
-			else if (!buffer->IsFilled(A_COL) && !endflag.a_col_end)
-			{
-				flag.a_col_req = true;
-				flag.weight_req = false;
-			}
-			else if (buffer->AColEnd() && remain_col_num == 0) 
-			{
-				flag.weight_req = false;
-				if (!buffer->ARowEnd())
-				{
-					if (!buffer->AuxIsFulled(false))
-					{
-						buffer->PopData(A_ROW);
-						present_row++;
-					}
-					else
-					{
-						stop = true;
-					}
-				}
-			}
+			//cout<<"over"<<endl; 
 		}
 	}
 	else
 	{
-		if (flag.mac_1)
+		if (buffer->ARowEnd() && buffer->AColEnd() && !flag.weight_uncompleted)
+			return;
+		if ((buffer->IsFilled(A_ROW) && buffer->IsFilled(A_COL) && !flag.weight_uncompleted) ||
+			(remain_col_num != 0 && buffer->IsFilled(A_COL) && !flag.weight_uncompleted))
 		{
-			if (stop)
-			{
-				if (!buffer->AuxIsFulled(false) && jc1)
-				{
-					remain_col_num = buffer->PopData(X_ROW);
-					present_row++;
-					if (remain_col_num != 0)
-					{
-						flag.weight_req = true;
-						flag.x_col_req = false;
-						flag.x_val_req = false;
-					}
-					stop = false;
-					jc1 = false;
-					return;
-				}
-				else if (!buffer->AuxIsFulled(false) && jc2)
-				{
-					remain_col_num = buffer->PopData(X_ROW);
-					present_row++;
-					stop = false;
-					jc2 = false;
-					return;
-				}
-				else
-				{
-					return;
-				}
-			}
-			if (buffer->IsFilled(X_ROW) && buffer->IsFilled(X_COL) && buffer->IsFilled(X_VAL))
-			{
-				if (remain_col_num == 0)
-				{
-					if (!buffer->AuxIsFulled(false))
-					{
-						remain_col_num = buffer->PopData(X_ROW);
-						present_row++;
-						if (remain_col_num != 0)
-						{
-							flag.weight_req = true;
-							flag.x_col_req = false;
-							flag.x_val_req = false;
-						}
-					}
-					else
-					{
-						stop = true;
-						jc1 = true;
-					}
-				}
-				else
-				{
-					flag.weight_req = true;
-					flag.x_col_req = false;
-					flag.x_val_req = false;
-				}
-					
-			}
-			else if (!buffer->XRowEnd() && buffer->XColEnd() && buffer->XValEnd())
-			{
-				if (!buffer->AuxIsFulled(false))
-				{
-					remain_col_num = buffer->PopData(X_ROW);
-					present_row++;
-				}
-				else
-				{
-					stop = true;
-					jc2 = true;
-				}
-			}
-			else if (!buffer->IsFilled(X_ROW) && !endflag.x_row_end)
-			{
-				flag.x_row_req = true;
-			}
-			else if (!buffer->IsFilled(X_COL) && !buffer->IsFilled(X_VAL) && !endflag.x_col_end && !endflag.x_val_end)
-			{
-				flag.x_col_req = true;
-				flag.x_val_req = true;
-			}
+			flag.a_row_req = false;
+			flag.a_col_req = false;
+			flag.weight_req = true;
 		}
-		else
+		if (flag.a_row_req && !endflag.a_row_end && ((buffer->present_ax_req + buffer->HowMuchAXFilled()) <= (limit_ax_req - MAX_READ_BYTE)))
 		{
-			if (stop)
+			Request(A_ROW);
+			buffer->present_ax_req += MAX_READ_BYTE;
+			if (!endflag.a_col_end)
 			{
-				if (!buffer->AuxIsFulled(false) && jc1)
-				{
-					remain_col_num = buffer->PopData(A_ROW);
-					present_row++;
-					if (remain_col_num != 0)
-					{
-						flag.weight_req = true;
-						flag.a_col_req = false;
-					}
-					stop = false;
-					jc1 = false;
-					return;
-				}
-				else if (!buffer->AuxIsFulled(false) && jc2)
-				{
-					remain_col_num = buffer->PopData(A_ROW);
-					present_row++;
-					stop = false;
-					jc2 = false;
-					return;
-				}
-				else
-				{
-					return;
-				}
-			}
-			if (buffer->IsFilled(A_ROW) && buffer->IsFilled(A_COL) && flag.ax_req_ok)
-			{	
-				if (remain_col_num == 0)
-				{
-					if (!buffer->AuxIsFulled(false))
-					{
-						remain_col_num = buffer->PopData(A_ROW);
-						present_row++;
-						if (remain_col_num != 0)
-						{
-							flag.weight_req = true;
-							flag.a_col_req = false;
-						}
-					}
-					else
-					{
-						stop = true;
-						jc1 = true;
-					}
-				}
-				else
-				{
-					flag.weight_req = true;
-					flag.a_col_req = false;
-				}
-			}
-			else if (!buffer->ARowEnd() && buffer->AColEnd())
-			{
-				if (!buffer->AuxIsFulled(false))
-				{
-					remain_col_num = buffer->PopData(A_ROW);
-					present_row++;
-				}
-				else
-				{
-					stop = true;
-					jc2 = true;
-				}
-			}
-			else if (!buffer->IsFilled(A_ROW) && !endflag.a_row_end)
-			{
-				flag.a_row_req = true;
-			}
-			else if (!buffer->IsFilled(A_COL) && !endflag.a_col_end)
-			{
+				flag.a_row_req = false;
 				flag.a_col_req = true;
 			}
 		}
+		else if (flag.a_col_req && !endflag.a_col_end && ((buffer->present_ax_req + buffer->HowMuchAXFilled()) <= (limit_ax_req - MAX_READ_BYTE)))
+		{
+			Request(A_COL);
+			buffer->present_ax_req += MAX_READ_BYTE;
+			if (buffer->IsFilled(A_ROW) && buffer->IsFilled(A_COL))
+			{
+				flag.a_col_req = false;
+				flag.weight_req = true;
+			}
+		}
+		else if (flag.weight_req && !buffer->AuxIsFulled())
+		{
+			if (remain_col_num == 0)
+			{
+				remain_col_num = buffer->PopData(A_ROW);
+				present_row++;
+				if (remain_col_num == 0)
+				{
+					return;
+				}
+			}
+			present_col = buffer->PopData(A_COL);
+			remain_col_num--;
+			uint64_t address = OUTPUT_START + (present_col * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
+			temp.w_start_addr = address & mask;
+			temp.w_end_addr = (address + 63) & mask;
+			buffer->PassWeightAddress(temp.w_start_addr, temp.w_end_addr);
+			if (!buffer->isExist(temp.w_start_addr) && !buffer->Requested(temp.w_start_addr))
+				temp.check1 = true;
+			else
+				temp.check1 = false;
+			if (temp.w_start_addr == temp.w_end_addr)
+			{
+				if (!buffer->isExist(temp.w_end_addr) && !buffer->Requested(temp.w_end_addr))
+					temp.check2 = true;
+				else
+					temp.check2 = false;
+			}
+			else
+				temp.check2 = false;
+			if (temp.check1 && temp.check2 && buffer->canRequest(true))
+			{
+				RequestWeight(temp.w_start_addr);
+				RequestWeight(temp.w_end_addr);
+				temp.check1 = false;
+				temp.check2 = false;
+			}
+			else if (temp.check1 && buffer->canRequest(false))
+			{
+				RequestWeight(temp.w_start_addr);
+				temp.check1 = false;
+			}
+			else if (temp.check2 && buffer->canRequest(false))
+			{
+				RequestWeight(temp.w_end_addr);
+				temp.check2= false;
+			}
+			else
+			{
+				if (temp.check1 || temp.check2)
+				{
+					flag.weight_req = false;
+					flag.weight_uncompleted = true;
+					return;
+				}
+			}
+			if (remain_col_num == 0 && !buffer->IsFilled(A_ROW) && !endflag.a_row_end)
+			{
+				flag.weight_req = false;
+				flag.a_row_req = true;
+			}
+			else if (!buffer->IsFilled(A_COL) && 
+					 !endflag.a_col_end)
+			{
+				flag.weight_req = false;
+				flag.a_col_req = true;
+			}
+			else if ((remain_col_num == 0 && 
+					 !buffer->IsFilled(A_ROW) && 
+					 endflag.a_row_end &&
+					 buffer->IsFilled(A_COL)) ||
+					 (buffer->ARowEnd() &&
+					 buffer->AColEnd()))
+			{
+				flag.weight_req = false;
+			}
+		}
+		else if (flag.weight_uncompleted)
+		{
+			if (temp.check1 && temp.check2 && buffer->canRequest(true))
+			{
+				RequestWeight(temp.w_start_addr);
+				RequestWeight(temp.w_end_addr);
+				flag.weight_uncompleted = false;
+				temp.check1 = false;
+				temp.check2 = false;
+			}
+			else if (temp.check1 && buffer->canRequest(false))
+			{
+				RequestWeight(temp.w_start_addr);
+				flag.weight_uncompleted = false;
+				temp.check1 = false;
+			}
+			else if (temp.check2 && buffer->canRequest(false))
+			{
+				RequestWeight(temp.w_end_addr);
+				flag.weight_uncompleted = false;
+				temp.check2 = false;
+			}
+			if (!flag.weight_uncompleted)
+			{
+				if (remain_col_num == 0 && !buffer->IsFilled(A_ROW) && !endflag.a_row_end)
+				{
+					flag.weight_req = false;
+					flag.a_row_req = true;
+				}
+				else if (!buffer->IsFilled(A_COL) && 
+						 !endflag.a_col_end)
+				{
+					flag.weight_req = false;
+					flag.a_col_req = true;
+				}
+				else if ((remain_col_num == 0 && 
+						 !buffer->IsFilled(A_ROW) && 
+						 endflag.x_row_end &&
+						 buffer->IsFilled(A_COL)) ||
+						 (buffer->ARowEnd() &&
+					 	 buffer->AColEnd()))
+				{
+					flag.weight_req = false;
+				}
+			}
+		}
 	}
+	
 }
 
 void Accelerator::MACControllerRun()
@@ -769,7 +528,8 @@ void Accelerator::MACControllerRun()
 				macflag.v_fold_over = true;
 				macflag.second_get = true;
 				buffer->Expire(present.weight.tuple[0]);
-				buffer->Expire(present.weight.tuple[1]);
+				if (present.weight.tuple[0] == present.weight.tuple[1])
+					buffer->Expire(present.weight.tuple[1]);
 				macflag.macisready = false;
 				if (remain_mac_col == 0)
 				{
@@ -849,7 +609,8 @@ void Accelerator::MACControllerRun()
 				macflag.v_fold_over = true;
 				macflag.second_get = true;
 				buffer->Expire(present.weight.tuple[0]);
-				buffer->Expire(present.weight.tuple[1]);
+				if (present.weight.tuple[0] == present.weight.tuple[1])
+					buffer->Expire(present.weight.tuple[1]);
 				macflag.macisready = false;
 				if (remain_mac_col == 0)
 				{
@@ -889,10 +650,7 @@ void Accelerator::Request(Type iswhat)
 			a_col_addr += MAX_READ_BYTE;
 			cheat.colindex += MAX_READ_INT;
 			if (cheat.colindex >= buffer->data->adjcolindex.size())
-			{
-				flag.a_col_req = false;
 				endflag.a_col_end = true;
-			}
 			dram->DRAMRequest(address, false);
 			cout<<"Request A_COLUMN. Address: "<<hex<<address<<endl;
 			break;
@@ -901,10 +659,7 @@ void Accelerator::Request(Type iswhat)
 			a_row_addr += MAX_READ_BYTE;
 			cheat.rowindex += MAX_READ_INT;
 			if (cheat.rowindex >= buffer->data->adjrowindex.size())
-			{
-				flag.a_row_req = false;
 				endflag.a_row_end = true;;
-			}
 			dram->DRAMRequest(address, false);
 			cout<<"Request A_ROW. Address: "<<hex<<address<<endl;
 			break;
@@ -913,10 +668,7 @@ void Accelerator::Request(Type iswhat)
 			x_val_addr += MAX_READ_BYTE;
 			cheat.valindex += MAX_READ_INT;
 			if (cheat.valindex >= buffer->data->ifvalue.size())
-			{
-				flag.x_val_req = false;
 				endflag.x_val_end = true;
-			}
 			dram->DRAMRequest(address, false);
 			cout<<"Request X_VALUE. Address: "<<hex<<address<<endl;
 			break;
@@ -925,10 +677,7 @@ void Accelerator::Request(Type iswhat)
 			x_col_addr += MAX_READ_BYTE;
 			cheat.colindex += MAX_READ_INT;
 			if (cheat.colindex >= buffer->data->ifcolindex.size())
-			{
-				flag.x_col_req = false;
 				endflag.x_col_end = true;
-			}
 			dram->DRAMRequest(address, false);
 			cout<<"Request X_COLUMN. Address: "<<hex<<address<<endl;
 			break;
@@ -937,10 +686,7 @@ void Accelerator::Request(Type iswhat)
 			x_row_addr += MAX_READ_BYTE;
 			cheat.rowindex += MAX_READ_INT;
 			if (cheat.rowindex >= buffer->data->ifrowindex.size())
-			{
-				flag.x_row_req = false;
 				endflag.x_row_end = true;
-			}
 			dram->DRAMRequest(address, false);
 			cout<<"Request X_ROW. Address: "<<hex<<address<<endl;
 			break;

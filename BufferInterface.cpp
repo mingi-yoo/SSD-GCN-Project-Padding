@@ -189,21 +189,21 @@ bool BufferInterface::AuxIsFilled(Type iswhat)
 	return ret;
 }
 
-bool BufferInterface::AuxIsFulled(bool isweight)
+bool BufferInterface::AuxIsFulled()
 {
-	if (!isweight)
-		return (aux_axbuffer.remain_space == 0);
+	if (!isA)
+		return (aux_axbuffer.remain_space < 5 * UNIT_INT_BYTE);
 	else
-		return (aux_axbuffer.remain_space <= UNIT_INT_BYTE);
+		return (aux_axbuffer.remain_space < 4 * UNIT_INT_BYTE);
 }
 
 void BufferInterface::Reset()
 {
 	axbuffer.size = axbuffersize;
 	axbuffer.remain_space = axbuffersize;
-	axbuffer.valindex = 0;
-	axbuffer.colindex = 0;
-	axbuffer.rowindex = 0;
+	axbuffer.valindex = -1;
+	axbuffer.colindex = -1;
+	axbuffer.rowindex = -1;
 
 	aux_axbuffer.size = axbuffersize;
 	aux_axbuffer.remain_space = axbuffersize;
@@ -345,6 +345,11 @@ uint64_t BufferInterface::ReadMACData(Type iswhat)
 	}
 
 	return ret;
+}
+
+uint64_t BufferInterface::HowMuchAXFilled()
+{
+	return (axbuffer.size - axbuffer.remain_space);
 }
 
 float BufferInterface::ReadValMACData()
@@ -508,21 +513,41 @@ bool BufferInterface::isReady(uint64_t address)
 	}
 	return false;
 }
-bool BufferInterface::canRequest()
+bool BufferInterface::canRequest(bool istwo)
 {
-	if(weightbuffersize - present_w_req >= MAX_READ_BYTE) // 버퍼가 아직 다 안채워진 경우 -> 가능
+	if (!istwo)
 	{
-		return true;
+		if(weightbuffersize - present_w_req >= MAX_READ_BYTE) // 버퍼가 아직 다 안채워진 경우 -> 가능
+		{
+			return true;
+		}
+		else if(!weightbuffer.expire.empty()) // 버퍼 내에 삭제 가능한 데이터가 있는 경우 -> 가능
+		{
+			weightbuffer.expire.erase(weightbuffer.expire.begin());
+			present_w_req -= MAX_READ_BYTE;
+			return true;
+		}
+		else // 모든 데이터가 사용중이므로 request 불가?
+		{
+			return false;
+		}
 	}
-	else if(!weightbuffer.expire.empty()) // 버퍼 내에 삭제 가능한 데이터가 있는 경우 -> 가능
+	else
 	{
-		weightbuffer.expire.erase(weightbuffer.expire.begin());
-		present_w_req -= MAX_READ_BYTE;
-		return true;
-	}
-	else // 모든 데이터가 사용중이므로 request 불가?
-	{
-		return false;
+		if(weightbuffersize - present_w_req >= MAX_READ_BYTE * 2) // 버퍼가 아직 다 안채워진 경우 -> 가능
+		{
+			return true;
+		}
+		else if(weightbuffer.expire.size() >= 2) // 버퍼 내에 삭제 가능한 데이터가 있는 경우 -> 가능
+		{
+			weightbuffer.expire.erase(weightbuffer.expire.begin(), weightbuffer.expire.begin() + 2);
+			present_w_req -= MAX_READ_BYTE * 2;
+			return true;
+		}
+		else // 모든 데이터가 사용중이므로 request 불가?
+		{
+			return false;
+		}
 	}
 }
 

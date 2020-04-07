@@ -22,7 +22,7 @@ struct AccFlag
 	bool x_col_req;
 	bool x_row_req;
 	bool weight_req;
-	bool output_req;
+	bool weight_uncompleted;
 	bool mac_req;
 	bool mac_1;
 	bool mac_2;
@@ -58,12 +58,12 @@ struct MACAuxFlag
 	bool maciszero;
 };
 
-struct WeightReqFlag
+struct TempRegister
 {
-	bool label1;
-	bool label2;
-	bool label3;
-	bool label4;
+	bool check1;
+	bool check2;
+	uint64_t w_start_addr;
+	uint64_t w_end_addr;
 };
 
 class Accelerator {
@@ -96,7 +96,6 @@ private:
 	uint64_t mask;
 	bool macover;
 	bool programover;
-	bool stop;
 	bool jc1;
 	bool jc2;
 	AXBuffer cheat; //리퀘스트가 더 가능한지 확인하는 변수
@@ -107,7 +106,7 @@ private:
 	AccFlag flag;
 	EndFlag endflag;
 	MACAuxFlag macflag;
-	WeightReqFlag reqflag;
+	TempRegister temp;
 	void RequestControllerRun();
 	void MACControllerRun();
 	void Request(Type iswhat);

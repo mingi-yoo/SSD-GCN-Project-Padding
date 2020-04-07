@@ -50,7 +50,7 @@ public:
 	void FillBuffer(uint64_t address, Type iswhat);
 	bool IsFilled(Type iswhat);
 	bool AuxIsFilled(Type iswhat);
-	bool AuxIsFulled(bool isweight);
+	bool AuxIsFulled();
 	bool XEnd(); //MAC2로 넘어갈 준비가 되었는가
 	bool AEnd(); //모든 MAC이 끝났는가
 	bool XRowEnd();
@@ -65,6 +65,7 @@ public:
 	bool AuxAColEnd();
 	bool isReady(uint64_t address);
 	void Reset(); //다시 채우는 함수
+	uint64_t HowMuchAXFilled();
 	uint64_t PopData(Type iswhat);
 	float PopValData();
 	uint64_t ReadMACData(Type iswhat);
@@ -72,7 +73,7 @@ public:
 	Tuple ReadWeightTuple();
 	void PassWeightAddress(uint64_t w_start_addr, uint64_t w_end_addr);
 	//weight용
-	bool canRequest();
+	bool canRequest(bool istwo);
 	void Request(uint64_t address);
 	bool Requested(uint64_t address); // RequestController 에서만 사용되어야 함
 	bool isExist(uint64_t address); //weight 값 존재? (Request controller에서만 사용되어야 함)
