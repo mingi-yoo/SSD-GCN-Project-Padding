@@ -183,7 +183,7 @@ void Accelerator::RequestControllerRun()
 			buffer->PopValData();
 			remain_col_num--;
 			temp.w_addr = WEIGHT_START + (present_col * (w_fold + 1) + present_w_fold ) * MAX_READ_BYTE;
-			if (!buffer->isExist(temp.w_addr) && !buffer->Requested(temp.w_ddr))
+			if (!buffer->isExist(temp.w_addr) && !buffer->Requested(temp.w_addr))
 				temp.check = true;
 			else
 				temp.check = false;
@@ -314,7 +314,7 @@ void Accelerator::RequestControllerRun()
 			present_col = buffer->PopData(A_COL);
 			remain_col_num--;
 			uint64_t address = OUTPUT_START + (present_col * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
-			if (!buffer->isExist(temp.w_addr) && !buffer->Requested(temp.w_ddr))
+			if (!buffer->isExist(temp.w_addr) && !buffer->Requested(temp.w_addr))
 				temp.check = true;
 			else
 				temp.check = false;
@@ -405,25 +405,21 @@ void Accelerator::MACControllerRun()
 				present.row = present_mac_row;
 				macflag.first_get = false;
 				macflag.fold_start = true;
-				if (remain_mac_col == 0)
-				{
-					macflag.maciszero = true;
-				}
 			}
-			if (remain_mac_col != 0 && 
-				buffer->AuxIsFilled(X_COL) && 
-				buffer->AuxIsFilled(X_VAL) && 
-				macflag.fold_start &&
-				!macflag.maciszero) //만일 zero row가 아니면
+			if (remain_mac_col != 0 && buffer->AuxIsFilled(X_COL) && buffer->AuxIsFilled(X_VAL) && macflag.fold_start) //만일 zero row가 아니면
 			{
 				present.col = buffer->ReadMACData(X_COL);
 				present.val = buffer->ReadValMACData();
-				present.weight = WEIGHT_START + (present_col * (w_fold + 1) + present_w_fold ) * MAX_READ_BYTE;
 				macflag.fold_start = false;
-				if (buffer->isReady(present.weight))
+				present.weight =  WEIGHT_START + (present.col * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+				if (buffer->isReady(present.weight)) //준비가 되었는가?
 					macflag.macisready = true;
 			}
-			else if (!macflag.first_get && !macflag.fold_start && !macflag.maciszero) //준비 되었는가?
+			else if (remain_mac_col == 0 && macflag.fold_start) //만일 zero row이면 maciszero 켜기
+			{
+				macflag.maciszero = true;
+			}
+			else if (!macflag.first_get && !macflag.fold_start) //준비 되었는가?
 			{
 				if (buffer->isReady(present.weight))
 					macflag.macisready = true;
@@ -452,7 +448,7 @@ void Accelerator::MACControllerRun()
 					macflag.macisready = false;
 					macflag.fold_start = false;
 					cout<<"Row "<<dec<<present.row<<" is Complete."<<endl;
-					address = OUTPUT_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+					address = OUTPUT_START + (present.row * (w_fold + 1) + present_w_fold ) * MAX_READ_BYTE;
 					dram->DRAMRequest(address, true);
 					if (buffer->XEnd())
 						macover = true;
@@ -481,24 +477,21 @@ void Accelerator::MACControllerRun()
 				present_mac_row++;
 				present.row = present_mac_row;
 				macflag.first_get = false;
-				macflag.second_get = true;
-				if (remain_mac_col == 0)
-				{
-					macflag.maciszero = true;
-				}
+				macflag.fold_start = true;
 			}
-			if (remain_mac_col != 0 && 
-				buffer->AuxIsFilled(A_COL) && 
-				macflag.fold_start &&
-				!macflag.maciszero) //만일 zero row가 아니면
+			if (remain_mac_col != 0 && buffer->AuxIsFilled(A_COL) && macflag.fold_start)
 			{
 				present.col = buffer->ReadMACData(A_COL);
-				present.weight = OUTPUT_START + (present_col * (w_fold + 1) + present_w_fold ) * MAX_READ_BYTE;
 				macflag.fold_start = false;
+				present.weight =  OUTPUT_START + (present.col * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
 				if (buffer->isReady(present.weight))
 					macflag.macisready = true;
 			}
-			else if (!macflag.first_get && !macflag.fold_start && !macflag.maciszero) //준비 되었는가?
+			else if (remain_mac_col == 0 && macflag.fold_start)
+			{
+				macflag.maciszero = true;
+			}
+			else if (!macflag.first_get && !macflag.fold_start)
 			{
 				if (buffer->isReady(present.weight))
 					macflag.macisready = true;
@@ -517,7 +510,7 @@ void Accelerator::MACControllerRun()
 				present_v_fold = 0;
 				remain_mac_col--;
 				macflag.v_fold_over = true;
-				macflag.second_get = true;
+				macflag.fold_start = true;
 				buffer->Expire(present.weight);
 				macflag.macisready = false;
 				if (remain_mac_col == 0)
