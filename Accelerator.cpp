@@ -313,7 +313,7 @@ void Accelerator::RequestControllerRun()
 			}
 			present_col = buffer->PopData(A_COL);
 			remain_col_num--;
-			uint64_t address = OUTPUT_START + (present_col * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+			temp.w_addr = OUTPUT_START + (present_col * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
 			if (!buffer->isExist(temp.w_addr) && !buffer->Requested(temp.w_addr))
 				temp.check = true;
 			else
