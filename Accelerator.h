@@ -45,7 +45,7 @@ struct Coordinate
 	uint64_t row;
 	uint64_t col;
 	float val;
-	Tuple weight;
+	uint64_t weight;
 };
 
 struct MACAuxFlag
@@ -60,10 +60,8 @@ struct MACAuxFlag
 
 struct TempRegister
 {
-	bool check1;
-	bool check2;
-	uint64_t w_start_addr;
-	uint64_t w_end_addr;
+	bool check;
+	uint64_t w_addr;
 };
 
 class Accelerator {

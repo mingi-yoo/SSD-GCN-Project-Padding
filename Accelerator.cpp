@@ -182,39 +182,18 @@ void Accelerator::RequestControllerRun()
 			present_col = buffer->PopData(X_COL);
 			buffer->PopValData();
 			remain_col_num--;
-			uint64_t address = WEIGHT_START + (present_col * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
-			temp.w_start_addr = address & mask;
-			temp.w_end_addr = (address + 63) & mask;
-			buffer->PassWeightAddress(temp.w_start_addr, temp.w_end_addr);
-			if (!buffer->isExist(temp.w_start_addr) && !buffer->Requested(temp.w_start_addr))
-				temp.check1 = true;
+			temp.w_addr = WEIGHT_START + (present_col * (w_fold + 1) + present_w_fold ) * MAX_READ_BYTE;
+			if (!buffer->isExist(temp.w_addr) && !buffer->Requested(temp.w_ddr))
+				temp.check = true;
 			else
-				temp.check1 = false;
-			if (temp.w_start_addr != temp.w_end_addr)
+				temp.check = false;
+			if (temp.check && buffer->canRequest(true))
 			{
-				if (!buffer->isExist(temp.w_end_addr) && !buffer->Requested(temp.w_end_addr))
-					temp.check2 = true;
-				else
-					temp.check2 = false;
-			}
-			else
-				temp.check2 = false;
-			if (temp.check1 && temp.check2 && buffer->canRequest(true))
-			{
-				RequestWeight(temp.w_start_addr);
-				RequestWeight(temp.w_end_addr);
-			}
-			else if (temp.check1 && buffer->canRequest(false))
-			{
-				RequestWeight(temp.w_start_addr);
-			}
-			else if (temp.check2 && buffer->canRequest(false))
-			{
-				RequestWeight(temp.w_end_addr);
+				RequestWeight(temp.w_addr);
 			}
 			else
 			{
-				if (temp.check1 || temp.check2)
+				if (temp.check)
 				{
 					flag.weight_req = false;
 					flag.weight_uncompleted = true;
@@ -252,25 +231,11 @@ void Accelerator::RequestControllerRun()
 		}
 		else if (flag.weight_uncompleted)
 		{
-			if (temp.check1 && temp.check2 && buffer->canRequest(true))
+			if (temp.check && buffer->canRequest(true))
 			{
-				RequestWeight(temp.w_start_addr);
-				RequestWeight(temp.w_end_addr);
+				RequestWeight(temp.w_addr);
 				flag.weight_uncompleted = false;
-				temp.check1 = false;
-				temp.check2 = false;
-			}
-			else if (temp.check1 && buffer->canRequest(false))
-			{
-				RequestWeight(temp.w_start_addr);
-				flag.weight_uncompleted = false;
-				temp.check1 = false;
-			}
-			else if (temp.check2 && buffer->canRequest(false))
-			{
-				RequestWeight(temp.w_end_addr);
-				flag.weight_uncompleted = false;
-				temp.check2 = false;
+				temp.check = false;
 			}
 			if (!flag.weight_uncompleted)
 			{
@@ -302,10 +267,6 @@ void Accelerator::RequestControllerRun()
 					//cout<<"13"<<endl;
 				}
 			}
-		}
-		else
-		{
-			//cout<<"over"<<endl; 
 		}
 	}
 	else
@@ -352,43 +313,18 @@ void Accelerator::RequestControllerRun()
 			}
 			present_col = buffer->PopData(A_COL);
 			remain_col_num--;
-			uint64_t address = OUTPUT_START + (present_col * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
-			temp.w_start_addr = address & mask;
-			temp.w_end_addr = (address + 63) & mask;
-			buffer->PassWeightAddress(temp.w_start_addr, temp.w_end_addr);
-			if (!buffer->isExist(temp.w_start_addr) && !buffer->Requested(temp.w_start_addr))
-				temp.check1 = true;
+			uint64_t address = OUTPUT_START + (present_col * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+			if (!buffer->isExist(temp.w_addr) && !buffer->Requested(temp.w_ddr))
+				temp.check = true;
 			else
-				temp.check1 = false;
-			if (temp.w_start_addr != temp.w_end_addr)
+				temp.check = false;
+			if (temp.check && buffer->canRequest(true))
 			{
-				if (!buffer->isExist(temp.w_end_addr) && !buffer->Requested(temp.w_end_addr))
-					temp.check2 = true;
-				else
-					temp.check2 = false;
-			}
-			else
-				temp.check2 = false;
-			if (temp.check1 && temp.check2 && buffer->canRequest(true))
-			{
-				RequestWeight(temp.w_start_addr);
-				RequestWeight(temp.w_end_addr);
-				temp.check1 = false;
-				temp.check2 = false;
-			}
-			else if (temp.check1 && buffer->canRequest(false))
-			{
-				RequestWeight(temp.w_start_addr);
-				temp.check1 = false;
-			}
-			else if (temp.check2 && buffer->canRequest(false))
-			{
-				RequestWeight(temp.w_end_addr);
-				temp.check2= false;
+				RequestWeight(temp.w_addr);
 			}
 			else
 			{
-				if (temp.check1 || temp.check2)
+				if (temp.check)
 				{
 					flag.weight_req = false;
 					flag.weight_uncompleted = true;
@@ -418,25 +354,11 @@ void Accelerator::RequestControllerRun()
 		}
 		else if (flag.weight_uncompleted)
 		{
-			if (temp.check1 && temp.check2 && buffer->canRequest(true))
+			if (temp.check && buffer->canRequest(true))
 			{
-				RequestWeight(temp.w_start_addr);
-				RequestWeight(temp.w_end_addr);
+				RequestWeight(temp.w_addr);
 				flag.weight_uncompleted = false;
-				temp.check1 = false;
-				temp.check2 = false;
-			}
-			else if (temp.check1 && buffer->canRequest(false))
-			{
-				RequestWeight(temp.w_start_addr);
-				flag.weight_uncompleted = false;
-				temp.check1 = false;
-			}
-			else if (temp.check2 && buffer->canRequest(false))
-			{
-				RequestWeight(temp.w_end_addr);
-				flag.weight_uncompleted = false;
-				temp.check2 = false;
+				temp.check = false;
 			}
 			if (!flag.weight_uncompleted)
 			{
@@ -482,7 +404,7 @@ void Accelerator::MACControllerRun()
 				present_mac_row++;
 				present.row = present_mac_row;
 				macflag.first_get = false;
-				macflag.second_get = true;
+				macflag.fold_start = true;
 				if (remain_mac_col == 0)
 				{
 					macflag.maciszero = true;
@@ -491,24 +413,19 @@ void Accelerator::MACControllerRun()
 			if (remain_mac_col != 0 && 
 				buffer->AuxIsFilled(X_COL) && 
 				buffer->AuxIsFilled(X_VAL) && 
-				macflag.second_get &&
+				macflag.fold_start &&
 				!macflag.maciszero) //만일 zero row가 아니면
 			{
 				present.col = buffer->ReadMACData(X_COL);
 				present.val = buffer->ReadValMACData();
-				macflag.second_get = false;
-				macflag.fold_start = true;
-			}
-			if (buffer->AuxIsFilled(WEIGHT) && macflag.fold_start && !macflag.maciszero)
-			{
+				present.weight = WEIGHT_START + (present_col * (w_fold + 1) + present_w_fold ) * MAX_READ_BYTE;
 				macflag.fold_start = false;
-				present.weight = buffer->ReadWeightTuple();
-				if (buffer->isReady(present.weight.tuple[0]) && buffer->isReady(present.weight.tuple[1])) //준비가 되었는가?
+				if (buffer->isReady(present.weight))
 					macflag.macisready = true;
 			}
-			else if (!macflag.first_get && !macflag.second_get && !macflag.fold_start && !macflag.maciszero) //준비 되었는가?
+			else if (!macflag.first_get && !macflag.fold_start && !macflag.maciszero) //준비 되었는가?
 			{
-				if (buffer->isReady(present.weight.tuple[0]) && buffer->isReady(present.weight.tuple[1]))
+				if (buffer->isReady(present.weight))
 					macflag.macisready = true;
 			}
 		}
@@ -526,10 +443,8 @@ void Accelerator::MACControllerRun()
 				present_v_fold = 0;
 				remain_mac_col--;
 				macflag.v_fold_over = true;
-				macflag.second_get = true;
-				buffer->Expire(present.weight.tuple[0]);
-				if (present.weight.tuple[0] != present.weight.tuple[1])
-					buffer->Expire(present.weight.tuple[1]);
+				macflag.fold_start = true;
+				buffer->Expire(present.weight);
 				macflag.macisready = false;
 				if (remain_mac_col == 0)
 				{
@@ -537,7 +452,7 @@ void Accelerator::MACControllerRun()
 					macflag.macisready = false;
 					macflag.fold_start = false;
 					cout<<"Row "<<dec<<present.row<<" is Complete."<<endl;
-					address = OUTPUT_START + (present.row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
+					address = OUTPUT_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
 					dram->DRAMRequest(address, true);
 					if (buffer->XEnd())
 						macover = true;
@@ -549,7 +464,7 @@ void Accelerator::MACControllerRun()
 			macflag.v_fold_over = true;
 			macflag.maciszero = false;
 			macflag.first_get = true;
-			address = OUTPUT_START + (present.row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
+			address = OUTPUT_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
 			cout<<"MAC1 Running... Row: "<<dec<<present.row<<" is zero row...."<<endl;
 			dram->DRAMRequest(address, true);
 			if (buffer->XEnd())
@@ -573,26 +488,19 @@ void Accelerator::MACControllerRun()
 				}
 			}
 			if (remain_mac_col != 0 && 
-				buffer->AuxIsFilled(A_COL) &&
-				macflag.second_get &&
-				!macflag.maciszero)
+				buffer->AuxIsFilled(A_COL) && 
+				macflag.fold_start &&
+				!macflag.maciszero) //만일 zero row가 아니면
 			{
 				present.col = buffer->ReadMACData(A_COL);
-				macflag.second_get = false;
-				macflag.fold_start = true;
-			}
-			if (buffer->AuxIsFilled(WEIGHT) && macflag.fold_start && !macflag.maciszero)
-			{
+				present.weight = OUTPUT_START + (present_col * (w_fold + 1) + present_w_fold ) * MAX_READ_BYTE;
 				macflag.fold_start = false;
-				present.weight = buffer->ReadWeightTuple();
-				if (present_mac_row == 21)
-					cout<<hex<<present.weight.tuple[0]<<" "<<hex<<present.weight.tuple[1]<<endl;
-				if (buffer->isReady(present.weight.tuple[0]) && buffer->isReady(present.weight.tuple[1]))
+				if (buffer->isReady(present.weight))
 					macflag.macisready = true;
 			}
-			else if (!macflag.first_get && !macflag.second_get && !macflag.fold_start && !macflag.maciszero)
+			else if (!macflag.first_get && !macflag.fold_start && !macflag.maciszero) //준비 되었는가?
 			{
-				if (buffer->isReady(present.weight.tuple[0]) && buffer->isReady(present.weight.tuple[1]))
+				if (buffer->isReady(present.weight))
 					macflag.macisready = true;
 			}
 		}
@@ -610,9 +518,7 @@ void Accelerator::MACControllerRun()
 				remain_mac_col--;
 				macflag.v_fold_over = true;
 				macflag.second_get = true;
-				buffer->Expire(present.weight.tuple[0]);
-				if (present.weight.tuple[0] != present.weight.tuple[1])
-					buffer->Expire(present.weight.tuple[1]);
+				buffer->Expire(present.weight);
 				macflag.macisready = false;
 				if (remain_mac_col == 0)
 				{
@@ -620,7 +526,7 @@ void Accelerator::MACControllerRun()
 					macflag.macisready = false;
 					macflag.fold_start = false;
 					cout<<"Row "<<dec<<present.row<<" is Complete."<<endl;
-					address = OUTPUT_START + (present.row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
+					address = OUTPUT_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
 					dram->DRAMRequest(address, true);
 					if (buffer->AEnd())
 						macover = true;
@@ -632,7 +538,7 @@ void Accelerator::MACControllerRun()
 			macflag.v_fold_over = true;
 			macflag.maciszero = false;
 			macflag.first_get = true;
-			address = OUTPUT_START + (present.row * buffer->weightsize.tuple[1] + present_w_fold * MAX_READ_INT) * UNIT_INT_BYTE;
+			address = OUTPUT_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
 			cout<<"MAC2 Running... Row: "<<dec<<present.row<<" is zero row...."<<endl;
 			dram->DRAMRequest(address, true);
 			if (buffer->AEnd())
