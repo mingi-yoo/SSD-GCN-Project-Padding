@@ -18,7 +18,7 @@ struct AccFlag
 {
 	bool a_col_req;
 	bool a_row_req;
-	bool x_val_req; // 사실상 사용 안함
+	bool x_val_req; // dummy
 	bool x_col_req;
 	bool x_row_req;
 	bool weight_req;
@@ -31,7 +31,7 @@ struct EndFlag
 {
 	bool a_col_end;
 	bool a_row_end;
-	bool x_val_end; // 사실상 사용 안함
+	bool x_val_end; // dummy
 	bool x_col_end;
 	bool x_row_end;
 };
@@ -100,7 +100,7 @@ private:
 	void MACControllerRun();
 	uint64_t remain_mac_col;
 	uint64_t present_v_fold; // v_fold 계산
-	uint64_t present_mac_row; //present.row 에 단순 전달용?
+	uint64_t present_mac_row;
 	Coordinate present; //MACController 처리용
 	MACAuxFlag macflag;
 

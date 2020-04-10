@@ -39,3 +39,4 @@
 .DS_Store
 sim # executable
 *.txt # data file
+result

@@ -73,7 +73,7 @@ bool Accelerator::Run()
 		present_w_fold++;
 		buffer->Reset();
 		Reset();
-		flag.x_val_req = false;
+		flag.x_val_req = false; // dummy
 		flag.x_row_req = true;
 		flag.x_col_req = false;
 		flag.weight_req = false;
@@ -81,7 +81,6 @@ bool Accelerator::Run()
 		endflag.x_col_end = false;
 		endflag.x_val_end = false;
 		present_v_fold = 0;
-		buffer->present_ax_req = 0;
 		if (present_w_fold > w_fold)
 		{
 			programover = true;
