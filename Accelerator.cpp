@@ -38,20 +38,16 @@ Accelerator::Accelerator(uint64_t accdimension, DRAMInterface *dram_, BufferInte
 
 	remain_col_num = 0;
 	remain_mac_col = 0;
-	limit_ax_req = buffer_->axbuffersize;
-	limit_w_req = buffer_->weightbuffersize;
-	mask = (0xffffffffffffffff - MAX_READ_BYTE + 1);
+	limit_ax_req = buffer->axbuffersize;
 
 	cheat.valindex = 0;
 	cheat.colindex = 0;
 	cheat.rowindex = 0;
-	flag = {false, false, false, false, true, false, false, false, true, false, true, true, true};
+	flag = {false, false, false, false, true, false, false, true, false};
 	endflag = {false, false, false, false, false};
-	macflag = {true, false, false, false, false, false};
+	macflag = {true, false, false, false};
 	macover = false;
 	programover = false;
-	jc1 = false;
-	jc2 = false;
 }
 
 Accelerator::~Accelerator() {}
@@ -77,15 +73,14 @@ bool Accelerator::Run()
 		present_w_fold++;
 		buffer->Reset();
 		Reset();
+		flag.x_val_req = false; // dummy
 		flag.x_row_req = true;
-		flag.x_val_req = false;
 		flag.x_col_req = false;
 		flag.weight_req = false;
 		endflag.x_row_end = false;
 		endflag.x_col_end = false;
 		endflag.x_val_end = false;
 		present_v_fold = 0;
-		buffer->present_ax_req = 0;
 		if (present_w_fold > w_fold)
 		{
 			programover = true;
@@ -438,7 +433,6 @@ void Accelerator::MACControllerRun()
 			{
 				present_v_fold = 0;
 				remain_mac_col--;
-				macflag.v_fold_over = true;
 				macflag.fold_start = true;
 				buffer->Expire(present.weight);
 				macflag.macisready = false;
@@ -457,7 +451,6 @@ void Accelerator::MACControllerRun()
 		}
 		else if (macflag.maciszero) // zero인 경우 계산 
 		{
-			macflag.v_fold_over = true;
 			macflag.maciszero = false;
 			macflag.first_get = true;
 			address = OUTPUT_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
@@ -509,7 +502,6 @@ void Accelerator::MACControllerRun()
 			{
 				present_v_fold = 0;
 				remain_mac_col--;
-				macflag.v_fold_over = true;
 				macflag.fold_start = true;
 				buffer->Expire(present.weight);
 				macflag.macisready = false;
@@ -528,7 +520,6 @@ void Accelerator::MACControllerRun()
 		}
 		else if (macflag.maciszero)
 		{
-			macflag.v_fold_over = true;
 			macflag.maciszero = false;
 			macflag.first_get = true;
 			address = OUTPUT_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
@@ -613,6 +604,6 @@ void Accelerator::Reset()
 	cheat.rowindex = 0;
 	cheat.colindex = 0;
 	cheat.valindex = 0;
-	macflag = {true, false, false, false, false, false};
+	macflag = {true, false, false, false};
 	macover = false;
 }

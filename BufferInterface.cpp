@@ -23,9 +23,8 @@ BufferInterface::BufferInterface(uint64_t axbuffersize,
 	aux_axbuffer.colindex = 0;
 	aux_axbuffer.rowindex = 0;
 
-	weightbuffer.remain_space = weightbuffersize;
-	outputbuffer.remain_space = outputbuffersize;
-	mac_start = false;
+	weightbuffer.remain_space = weightbuffersize; // dummy
+	outputbuffer.remain_space = outputbuffersize; // dummy
 	isA = false;
 	data = data_;
 
@@ -41,11 +40,10 @@ BufferInterface::BufferInterface(uint64_t axbuffersize,
 	present_ax_req = 0;
 	present_w_req = 0;
 
-	flag = {false, false, false, false, false, false, false};
-	aux_flag = {false, false, false, false, false, false, false};
-	present = {0, 0, 0, 0};
-	aux_present = {0, 0, 0, 0};
-	log = {0, 0, 0, 0};
+	flag = {false, false, false, false, false};
+	aux_flag = {false, false, false, false, false};
+	present = {0, 0, 0};
+	aux_present = {0, 0, 0};
 }
 
 BufferInterface::~BufferInterface() {}
@@ -55,53 +53,43 @@ void BufferInterface::FillBuffer(uint64_t address, Type iswhat)
 	switch (iswhat)
 	{
 		case A_COL:
-			col_for_fold = axbuffer.colindex;
 			if (data->adjcolindex.size() - axbuffer.colindex -1 < MAX_READ_INT)
 				axbuffer.colindex = data->adjcolindex.size() - 1;
 			else
 				axbuffer.colindex += MAX_READ_INT;
 			axbuffer.remain_space -= MAX_READ_BYTE;
-			space_log = axbuffer.remain_space;
 			flag.a_col = true;
 			break;
 		case A_ROW:
-			row_for_fold = axbuffer.rowindex;
 			if (data->adjrowindex.size() - axbuffer.rowindex -1 < MAX_READ_INT)
 				axbuffer.rowindex = data->adjrowindex.size() - 1;
 			else
 				axbuffer.rowindex += MAX_READ_INT;
 			axbuffer.remain_space -= MAX_READ_BYTE;
-			space_log = axbuffer.remain_space;
 			flag.a_row = true;
 			break;
 		case X_VAL:
-			val_for_fold = axbuffer.valindex;
 			if (data->ifvalue.size() - axbuffer.valindex -1 < MAX_READ_INT)
 				axbuffer.valindex = data->ifvalue.size() - 1;
 			else
 				axbuffer.valindex += MAX_READ_INT;
 			axbuffer.remain_space -= MAX_READ_BYTE;
-			space_log = axbuffer.remain_space;
 			flag.x_val = true;
 			break;
 		case X_COL:
-			col_for_fold = axbuffer.colindex;
 			if (data->ifcolindex.size() - axbuffer.colindex -1 < MAX_READ_INT)
 				axbuffer.colindex = data->ifcolindex.size() - 1;
 			else
 				axbuffer.colindex += MAX_READ_INT;
 			axbuffer.remain_space -= MAX_READ_BYTE;
-			space_log = axbuffer.remain_space;
 			flag.x_col = true;
 			break;
 		case X_ROW:
-			row_for_fold = axbuffer.rowindex;
 			if (data->ifrowindex.size() - axbuffer.rowindex -1 < MAX_READ_INT)
 				axbuffer.rowindex = data->ifrowindex.size() - 1;
 			else
 				axbuffer.rowindex += MAX_READ_INT;
 			axbuffer.remain_space -= MAX_READ_BYTE;
-			space_log = axbuffer.remain_space;
 			flag.x_row = true;
 			break;
 		case WEIGHT:
@@ -115,7 +103,6 @@ void BufferInterface::FillBuffer(uint64_t address, Type iswhat)
 					WB_Data t = {address, iter->req};
 					weightbuffer.active.push_back(t);
 					weightbuffer.request.erase(iter);
-					flag.weight = true;
 					isWork = true;
 					break;
 				}
@@ -146,12 +133,8 @@ bool BufferInterface::IsFilled(Type iswhat)
 		case X_ROW:
 			ret = flag.x_row;
 			break;
-		case WEIGHT:
-			ret = flag.weight;
-			break;
-		case OUTPUT:
-			ret = flag.output;
-			break;
+		default:
+			ret = false;
 	}
 
 	return ret;
@@ -219,11 +202,10 @@ void BufferInterface::Reset()
 	weightbuffer.request.clear();
 	present_w_req = 0;
 
-	flag = {false, false, false, false, false, false, false};
-	aux_flag = {false, false, false, false, false, false, false};
-	present = {0, 0, 0, 0};
-	aux_present = {0, 0, 0, 0};
-	log = {0, 0, 0, 0};
+	flag = {false, false, false, false, false};
+	aux_flag = {false, false, false, false, false};
+	present = {0, 0, 0};
+	aux_present = {0, 0, 0};
 
 }
 
@@ -365,23 +347,6 @@ float BufferInterface::ReadValMACData()
 	return ret;
 }
 
-Tuple BufferInterface::ReadWeightTuple()
-{
-	Tuple ret;
-	vector<Tuple>::iterator iter = aux_axbuffer.w_addr.begin();
-	ret = aux_axbuffer.w_addr.front();
-	aux_axbuffer.w_addr.erase(iter);
-	aux_axbuffer.remain_space += UNIT_INT_BYTE * 2;
-
-	return ret;
-}
-
-void BufferInterface::PassWeightAddress(uint64_t w_start_addr, uint64_t w_end_addr)
-{
-	aux_axbuffer.w_addr.push_back({w_start_addr, w_end_addr});
-	aux_axbuffer.remain_space -= 2 * UNIT_INT_BYTE;
-}
-
 bool BufferInterface::XEnd()
 {
 	// TODO
@@ -455,45 +420,6 @@ bool BufferInterface::AColEnd()
 		return false;
 }
 
-bool BufferInterface::AuxXRowEnd()
-{
-	if (!isA && aux_present.rowindex >= data->ifrowindex.size())
-		return true;
-	else
-		return false;
-}
-
-bool BufferInterface::AuxXColEnd()
-{
-	if (!isA && aux_present.colindex >= data->ifcolindex.size())
-		return true;
-	else
-		return false;
-}
-
-bool BufferInterface::AuxXValEnd()
-{
-	if (!isA && aux_present.valindex >= data->ifvalue.size())
-		return true;
-	else
-		return false;
-}
-
-bool BufferInterface::AuxARowEnd()
-{
-	if (isA && aux_present.rowindex >= data->adjrowindex.size())
-		return true;
-	else
-		return false;
-}
-
-bool BufferInterface::AuxAColEnd()
-{
-	if (isA && aux_present.colindex >= data->adjcolindex.size())
-		return true;
-	else
-		return false;
-}
 /* weight buffer 를 위한 함수들
 *
 * canRequest() : request를 보낼 수 있는 상태인지 확인
@@ -631,82 +557,4 @@ bool BufferInterface::Expire(uint64_t address) // 특정 address만 expire하기
 	}
 
 	return false;
-}
-
-
-void BufferInterface::print_status()
-{
-	cout << "==Buffer==" << endl;
-
-	if (flag.a_col)
-	{
-		cout << "buffer_A_COL : {";
-		for (uint64_t i=col_for_fold; i<=axbuffer.colindex; i++)
-		{
-			cout << data->adjcolindex[i] << ", ";
-		}
-		cout << "}" << endl;
-	}
-
-	if (flag.a_row)
-	{
-		cout << "buffer_A_ROW : {";
-		for (uint64_t i=row_for_fold; i<=axbuffer.rowindex; i++)
-		{
-			cout << data->adjrowindex[i] << ", ";
-		}
-		cout << "}" << endl;
-	}
-
-	
-	if (flag.x_col)
-	{
-		cout << "buffer_X_COL : {";
-		for (uint64_t i=col_for_fold; i<=axbuffer.colindex; i++)
-		{
-			cout << data->ifcolindex[i] << ", ";
-		}
-		cout << "}" << endl;
-	}
-
-	if (flag.x_row)
-	{
-		cout << "buffer_X_ROW : {";
-		for (uint64_t i=row_for_fold; i<=axbuffer.rowindex; i++)
-		{
-			cout << data->ifrowindex[i] << ", ";
-		}
-		cout << "}" << endl;
-	}
-
-	if (flag.x_val)
-	{
-		cout << "buffer_X_VAL : {";
-		for (uint64_t i=val_for_fold; i<=axbuffer.valindex; i++)
-		{
-			cout << data->ifvalue[i] << ", ";
-		}
-		cout << "}" << endl;
-	}
-
-	cout << "buffer_WEIGHT : {";
-	for(WB_Data t: weightbuffer.active) {
-		cout << hex << t.address << dec << ", ";
-	}
-	for(WB_Data t: weightbuffer.expire) {
-		cout << hex << t.address << dec << ", ";
-	}
-	cout << "}" << endl;
-
-	cout << "buffer's remain_space (AX,W) : " << axbuffer.remain_space << ", " << weightbuffer.remain_space << endl;
-	cout << "flag : {" << flag.a_col << ", "
-						<< flag.a_row << ", "
-						<< flag.x_val << ", "
-						<< flag.x_col << ", "
-						<< flag.x_row << ", "
-						<< flag.weight << ", "
-						<< flag.output << "}"
-						<< endl;
-
-	cout << endl;
 }
