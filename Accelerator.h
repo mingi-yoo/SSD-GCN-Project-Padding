@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cmath>
 #include "DRAMInterface.h"
 #include "BufferInterface.h"
 #include "Common.h"
@@ -42,6 +43,13 @@ struct Coordinate
 	uint64_t col;
 	float val;
 	uint64_t weight;
+	uint64_t present_v_fold;
+	uint64_t remain_mac_col;
+	bool first_get;
+	bool fold_start;
+	bool macisready;
+	bool maciszero;
+	bool isend;
 };
 
 struct MACAuxFlag
@@ -98,12 +106,15 @@ private:
 
 	// MACControllerRun()
 	void MACControllerRun();
-	uint64_t remain_mac_col;
+	uint64_t *remain_mac_col;
 	uint64_t present_v_fold; // v_fold 계산
 	uint64_t present_mac_row;
-	Coordinate present; //MACController 처리용
+	Coordinate *present; //MACController 처리용
 	MACAuxFlag macflag;
-
+	uint64_t parallel;
+	uint64_t check_over;
+	uint64_t check_row;
+	uint64_t row_num;
 };
 
 #endif

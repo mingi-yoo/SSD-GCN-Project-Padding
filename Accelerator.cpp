@@ -45,9 +45,26 @@ Accelerator::Accelerator(uint64_t accdimension, DRAMInterface *dram_, BufferInte
 	cheat.rowindex = 0;
 	flag = {false, false, false, false, true, false, false, true, false};
 	endflag = {false, false, false, false, false};
-	macflag = {true, false, false, false};
 	macover = false;
 	programover = false;
+	parallel = (uint64_t)floor((double)num_of_pe/MAX_READ_INT);
+	if (num_of_pe < w_fold)
+		parallel++;
+	present = new Coordinate[parallel];
+	remain_mac_col = new uint64_t[buffer->num_of_xrow];
+	for (int i = 0; i < parallel; i++)
+	{
+		present[i].present_v_fold = 0;
+		present[i].first_get = true;
+		present[i].fold_start = false;
+		present[i].macisready = false;
+		present[i].maciszero = false;
+		present[i].isend = false;
+	}
+	check_over = parallel;
+	check_row = 0;
+	row_num = 0;
+
 }
 
 Accelerator::~Accelerator() {}
@@ -389,144 +406,171 @@ void Accelerator::MACControllerRun()
 
 	if (programover)
 		return;
-	if (flag.mac_1)
+	for (int i = 0; i < parallel; i++)
 	{
-		if (!macflag.macisready) //맨 처음 상태 
+		if (flag.mac_1)
 		{
-			if (buffer->AuxIsFilled(X_ROW) && macflag.first_get) //present라는 변수안에 처리해야할 데이터 집어넣음
+			if (!present[i].macisready) //맨 처음 상태 
 			{
-				remain_mac_col = buffer->ReadMACData(X_ROW);
-				present_mac_row++;
-				present.row = present_mac_row;
-				macflag.first_get = false;
-				macflag.fold_start = true;
-			}
-			if (remain_mac_col != 0 && buffer->AuxIsFilled(X_COL) && buffer->AuxIsFilled(X_VAL) && macflag.fold_start) //만일 zero row가 아니면
-			{
-				present.col = buffer->ReadMACData(X_COL);
-				present.val = buffer->ReadValMACData();
-				macflag.fold_start = false;
-				present.weight =  WEIGHT_START + (present.col * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
-				if (buffer->isReady(present.weight)) //준비가 되었는가?
-					macflag.macisready = true;
-			}
-			else if (remain_mac_col == 0 && macflag.fold_start) //만일 zero row이면 maciszero 켜기
-			{
-				macflag.maciszero = true;
-			}
-			else if (!macflag.first_get && !macflag.fold_start) //준비 되었는가?
-			{
-				if (buffer->isReady(present.weight))
-					macflag.macisready = true;
-			}
-		}
-		if (macflag.macisready) // 준비됐으면 계산
-		{
-			cout<<"MAC1 Running... v_fold: "<<dec<<present_v_fold<<
-			", w_fold: "<<dec<<present_w_fold<<
-			", Row: "<<dec<<present.row<<
-			", Col: "<<dec<<present.col<<
-			", Val: "<<present.val<<endl;
-			present_v_fold++;
-			if ((present_v_fold > v_fold && present_w_fold < w_fold) 
-				|| (present_v_fold > v_fold_last && present_w_fold == w_fold))
-			{
-				present_v_fold = 0;
-				remain_mac_col--;
-				macflag.fold_start = true;
-				buffer->Expire(present.weight);
-				macflag.macisready = false;
-				if (remain_mac_col == 0)
+				if (present[i].first_get) //present라는 변수안에 처리해야할 데이터 집어넣음
 				{
-					macflag.first_get = true;
-					macflag.macisready = false;
-					macflag.fold_start = false;
-					cout<<"Row "<<dec<<present.row<<" is Complete."<<endl;
-					address = OUTPUT_START + (present.row * (w_fold + 1) + present_w_fold ) * MAX_READ_BYTE;
-					dram->DRAMRequest(address, true);
-					if (buffer->XEnd())
-						macover = true;
+					if (buffer->AuxIsFilled(X_ROW) && check_row == 0)
+					{
+						check_row = buffer->ReadMACData(X_ROW);
+						present_mac_row++;
+						remain_mac_col[present_mac_row] = check_row;
+					}
+					else if (!buffer->AuxIsFilled(X_ROW) && check_row == 0)
+						continue;
+					present[i].remain_mac_col = check_row;
+					present[i].row = present_mac_row;
+					present[i].first_get = false;
+					present[i].fold_start = true;
+					if (check_row > 0) 
+						check_row--;
+				}
+				if (present[i].remain_mac_col != 0 && buffer->AuxIsFilled(X_COL) && buffer->AuxIsFilled(X_VAL) && present[i].fold_start) //만일 zero row가 아니면
+				{
+					present[i].col = buffer->ReadMACData(X_COL);
+					present[i].val = buffer->ReadValMACData();
+					present[i].fold_start = false;
+					present[i].weight =  WEIGHT_START + (present[i].col * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+					if (buffer->isReady(present[i].weight)) //준비가 되었는가?
+						present[i].macisready = true;
+				}
+				else if (present[i].remain_mac_col == 0 && present[i].fold_start) //만일 zero row이면 maciszero 켜기
+				{
+					present[i].maciszero = true;
+				}
+				else if (!present[i].first_get && !present[i].fold_start) //준비 되었는가?
+				{
+					if (buffer->isReady(present[i].weight))
+						present[i].macisready = true;
 				}
 			}
-		}
-		else if (macflag.maciszero) // zero인 경우 계산 
-		{
-			macflag.maciszero = false;
-			macflag.first_get = true;
-			address = OUTPUT_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
-			cout<<"MAC1 Running... Row: "<<dec<<present.row<<" is zero row...."<<endl;
-			dram->DRAMRequest(address, true);
-			if (buffer->XEnd())
-				macover = true;
-		}
-	}
-	else
-	{
-		if (!macflag.macisready)
-		{
-			if (buffer->AuxIsFilled(A_ROW) && macflag.first_get)
+			if (present[i].macisready) // 준비됐으면 계산
 			{
-				remain_mac_col = buffer->ReadMACData(A_ROW);
-				present_mac_row++;
-				present.row = present_mac_row;
-				macflag.first_get = false;
-				macflag.fold_start = true;
-			}
-			if (remain_mac_col != 0 && buffer->AuxIsFilled(A_COL) && macflag.fold_start)
-			{
-				present.col = buffer->ReadMACData(A_COL);
-				macflag.fold_start = false;
-				present.weight =  OUTPUT_START + (present.col * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
-				if (buffer->isReady(present.weight))
-					macflag.macisready = true;
-			}
-			else if (remain_mac_col == 0 && macflag.fold_start)
-			{
-				macflag.maciszero = true;
-			}
-			else if (!macflag.first_get && !macflag.fold_start)
-			{
-				if (buffer->isReady(present.weight))
-					macflag.macisready = true;
-			}
-		}
-		if (macflag.macisready)
-		{
-			cout<<"MAC2 Running... v_fold: "<<dec<<present_v_fold<<
-			", w_fold: "<<dec<<present_w_fold<<
-			", Row: "<<dec<<present.row<<
-			", Col: "<<dec<<present.col<<endl;
-			present_v_fold++;
-			if ((present_v_fold > v_fold && present_w_fold < w_fold) 
-				|| (present_v_fold > v_fold_last && present_w_fold == w_fold))
-			{
-				present_v_fold = 0;
-				remain_mac_col--;
-				macflag.fold_start = true;
-				buffer->Expire(present.weight);
-				macflag.macisready = false;
-				if (remain_mac_col == 0)
+				cout<<"MAC1 Running... v_fold: "<<dec<<present[i].present_v_fold<<
+				", w_fold: "<<dec<<present_w_fold<<
+				", Row: "<<dec<<present[i].row<<
+				", Col: "<<dec<<present[i].col<<
+				", Val: "<<present[i].val<<endl;
+				present[i].present_v_fold++;
+				if ((present[i].present_v_fold > v_fold && present_w_fold < w_fold) 
+					|| (present[i].present_v_fold > v_fold_last && present_w_fold == w_fold))
 				{
-					macflag.first_get = true;
-					macflag.macisready = false;
-					macflag.fold_start = false;
-					cout<<"Row "<<dec<<present.row<<" is Complete."<<endl;
-					address = OUTPUT2_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
-					dram->DRAMRequest(address, true);
-					if (buffer->AEnd())
-						macover = true;
+					present[i].present_v_fold = 0;
+					remain_mac_col[present[i].row]--;
+					present[i].remain_mac_col--;
+					present[i].fold_start = true;
+					present[i].first_get = true;
+					present[i].macisready = false;
+					present[i].fold_start = false;
+					buffer->Expire(present[i].weight);
+					present[i].macisready = false;
+					if (remain_mac_col[present[i].row] == 0)
+					{
+						cout<<"Row "<<dec<<present[i].row<<" is Complete."<<endl;
+						row_num++;
+						address = OUTPUT_START + (present[i].row * (w_fold + 1) + present_w_fold ) * MAX_READ_BYTE;
+						dram->DRAMRequest(address, true);
+						if (row_num == buffer->num_of_xrow)
+							macover = true;
+					}
 				}
 			}
+			else if (present[i].maciszero) // zero인 경우 계산 
+			{
+				present[i].maciszero = false;
+				present[i].first_get = true;
+				address = OUTPUT_START + (present[i].row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+				cout<<"MAC1 Running... Row: "<<dec<<present[i].row<<" is zero row...."<<endl;
+				row_num++;
+				dram->DRAMRequest(address, true);
+				if (row_num == buffer->num_of_xrow)
+					macover = true;
+			}
 		}
-		else if (macflag.maciszero)
+		else
 		{
-			macflag.maciszero = false;
-			macflag.first_get = true;
-			address = OUTPUT2_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
-			cout<<"MAC2 Running... Row: "<<dec<<present.row<<" is zero row...."<<endl;
-			dram->DRAMRequest(address, true);
-			if (buffer->AEnd())
-				macover = true;
+			if (!present[i].macisready)
+			{
+				if (present[i].first_get)
+				{
+					if (buffer->AuxIsFilled(A_ROW) && check_row == 0)
+					{
+						check_row = buffer->ReadMACData(A_ROW);
+						present_mac_row++;
+						remain_mac_col[present_mac_row] = check_row;
+					}
+					else if (!buffer->AuxIsFilled(A_ROW) && check_row == 0)
+						continue;
+					present[i].remain_mac_col = check_row;
+					present[i].row = present_mac_row;
+					present[i].first_get = false;
+					present[i].fold_start = true;
+					if (check_row > 0) 
+						check_row--;
+				}
+				if (present[i].remain_mac_col != 0 && buffer->AuxIsFilled(A_COL) && present[i].fold_start)
+				{
+					present[i].col = buffer->ReadMACData(A_COL);
+					present[i].fold_start = false;
+					present[i].weight =  OUTPUT_START + (present[i].col * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+					if (buffer->isReady(present[i].weight))
+						present[i].macisready = true;
+				}
+				else if (present[i].remain_mac_col == 0 && present[i].fold_start)
+				{
+					present[i].maciszero = true;
+				}
+				else if (!present[i].first_get && !present[i].fold_start)
+				{
+					if (buffer->isReady(present[i].weight))
+						present[i].macisready = true;
+				}
+			}
+			if (present[i].macisready)
+			{
+				cout<<"MAC2 Running... v_fold: "<<dec<<present[i].present_v_fold<<
+				", w_fold: "<<dec<<present_w_fold<<
+				", Row: "<<dec<<present[i].row<<
+				", Col: "<<dec<<present[i].col<<endl;
+				present[i].present_v_fold++;
+				if ((present[i].present_v_fold > v_fold && present_w_fold < w_fold) 
+					|| (present[i].present_v_fold > v_fold_last && present_w_fold == w_fold))
+				{
+					present[i].present_v_fold = 0;
+					present[i].remain_mac_col--;
+					remain_mac_col[present[i].row]--;
+					present[i].fold_start = true;
+					present[i].first_get = true;
+					present[i].macisready = false;
+					present[i].fold_start = false;
+					buffer->Expire(present[i].weight);
+					present[i].macisready = false;
+					if (remain_mac_col[present[i].row] == 0)
+					{
+						cout<<"Row "<<dec<<present[i].row<<" is Complete."<<endl;
+						row_num++;
+						address = OUTPUT2_START + (present[i].row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+						dram->DRAMRequest(address, true);
+						if (row_num == buffer->num_of_arow)
+							macover = true;
+					}
+				}
+			}
+			else if (present[i].maciszero)
+			{
+				present[i].maciszero = false;
+				present[i].first_get = true;
+				address = OUTPUT2_START + (present[i].row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+				cout<<"MAC2 Running... Row: "<<dec<<present[i].row<<" is zero row...."<<endl;
+				row_num++;
+				dram->DRAMRequest(address, true);
+				if (row_num == buffer->num_of_arow)
+					macover = true;
+			}
 		}
 	}
 }
@@ -604,6 +648,17 @@ void Accelerator::Reset()
 	cheat.rowindex = 0;
 	cheat.colindex = 0;
 	cheat.valindex = 0;
-	macflag = {true, false, false, false};
 	macover = false;
+	for (int i = 0; i < parallel; i++)
+	{
+		present[i].present_v_fold = 0;
+		present[i].first_get = true;
+		present[i].fold_start = false;
+		present[i].macisready = false;
+		present[i].maciszero = false;
+		present[i].isend = false;
+	}
+	row_num = 0;
+	check_over = parallel;
+	check_row = 0;
 }
