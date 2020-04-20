@@ -52,14 +52,6 @@ struct Coordinate
 	bool isend;
 };
 
-struct MACAuxFlag
-{
-	bool first_get;
-	bool fold_start;
-	bool macisready;
-	bool maciszero;
-};
-
 struct TempRegister
 {
 	bool check;
@@ -107,10 +99,8 @@ private:
 	// MACControllerRun()
 	void MACControllerRun();
 	uint64_t *remain_mac_col;
-	uint64_t present_v_fold; // v_fold 계산
 	uint64_t present_mac_row;
 	Coordinate *present; //MACController 처리용
-	MACAuxFlag macflag;
 	uint64_t parallel;
 	uint64_t check_over;
 	uint64_t check_row;

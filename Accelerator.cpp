@@ -27,7 +27,6 @@ Accelerator::Accelerator(uint64_t accdimension, DRAMInterface *dram_, BufferInte
 	if ((buffer_->weightsize.tuple[1] - w_fold * MAX_READ_INT) == v_fold_last * accdimension && v_fold_last > 0)
 		v_fold_last--;
 	present_w_fold = 0;
-	present_v_fold = 0;
 	present_mac_row = -1;
 	present_row = -1;
 
@@ -97,7 +96,6 @@ bool Accelerator::Run()
 		endflag.x_row_end = false;
 		endflag.x_col_end = false;
 		endflag.x_val_end = false;
-		present_v_fold = 0;
 		if (present_w_fold > w_fold)
 		{
 			programover = true;
@@ -124,7 +122,6 @@ bool Accelerator::Run()
 		flag.weight_req = false;
 		endflag.a_row_end = false;
 		endflag.a_col_end = false;
-		present_v_fold = 0;
 		if (present_w_fold > w_fold)
 		{
 			programover = true;			
@@ -461,7 +458,6 @@ void Accelerator::MACControllerRun()
 				{
 					present[i].present_v_fold = 0;
 					remain_mac_col[present[i].row]--;
-					present[i].remain_mac_col--;
 					present[i].fold_start = true;
 					present[i].first_get = true;
 					present[i].macisready = false;
@@ -541,7 +537,6 @@ void Accelerator::MACControllerRun()
 					|| (present[i].present_v_fold > v_fold_last && present_w_fold == w_fold))
 				{
 					present[i].present_v_fold = 0;
-					present[i].remain_mac_col--;
 					remain_mac_col[present[i].row]--;
 					present[i].fold_start = true;
 					present[i].first_get = true;
