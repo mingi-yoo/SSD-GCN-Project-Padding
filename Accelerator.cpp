@@ -511,7 +511,7 @@ void Accelerator::MACControllerRun()
 					macflag.macisready = false;
 					macflag.fold_start = false;
 					cout<<"Row "<<dec<<present.row<<" is Complete."<<endl;
-					address = OUTPUT_START2 + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+					address = OUTPUT2_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
 					dram->DRAMRequest(address, true);
 					if (buffer->AEnd())
 						macover = true;
@@ -522,7 +522,7 @@ void Accelerator::MACControllerRun()
 		{
 			macflag.maciszero = false;
 			macflag.first_get = true;
-			address = OUTPUT_START2 + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
+			address = OUTPUT2_START + (present.row * (w_fold + 1) + present_w_fold) * MAX_READ_BYTE;
 			cout<<"MAC2 Running... Row: "<<dec<<present.row<<" is zero row...."<<endl;
 			dram->DRAMRequest(address, true);
 			if (buffer->AEnd())
