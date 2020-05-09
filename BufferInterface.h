@@ -37,6 +37,8 @@ public:
 	uint64_t present_ax_req; //현재 accelerator가 리퀘스트 한 정도
 	uint64_t mac1_count;
 	uint64_t mac2_count;
+	uint64_t num_of_xrow;
+	uint64_t num_of_arow;
 	bool isA;
 	BufferInterface(uint64_t axbuffersize, 
 					uint64_t weightbuffersize, 

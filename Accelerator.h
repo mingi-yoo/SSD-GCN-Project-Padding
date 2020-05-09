@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cmath>
 #include "DRAMInterface.h"
 #include "BufferInterface.h"
 #include "Common.h"
@@ -42,14 +43,14 @@ struct Coordinate
 	uint64_t col;
 	float val;
 	uint64_t weight;
-};
-
-struct MACAuxFlag
-{
+	uint64_t present_v_fold;
+	uint64_t remain_mac_col;
 	bool first_get;
 	bool fold_start;
 	bool macisready;
 	bool maciszero;
+	bool isend;
+	int macstep;
 };
 
 struct TempRegister
@@ -64,6 +65,7 @@ public :
 	~Accelerator();
 	bool Run();
 private:
+	bool over;
 	// Ini에서 고정되는 값들
 	uint64_t num_of_pe; // 사용 안함 - 단순 기록용?
 	uint64_t w_fold;
@@ -98,12 +100,14 @@ private:
 
 	// MACControllerRun()
 	void MACControllerRun();
-	uint64_t remain_mac_col;
-	uint64_t present_v_fold; // v_fold 계산
+	uint64_t *remain_mac_col;
 	uint64_t present_mac_row;
-	Coordinate present; //MACController 처리용
-	MACAuxFlag macflag;
-
+	Coordinate *present; //MACController 처리용
+	uint64_t step;
+	uint64_t count;
+	uint64_t check_over;
+	uint64_t check_row;
+	uint64_t row_num;
 };
 
 #endif
